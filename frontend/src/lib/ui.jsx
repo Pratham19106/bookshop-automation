@@ -3,6 +3,7 @@ import { get, qs } from './api';
 import { fmt, label, STATUS_KIND } from './format';
 import { fail } from './overlays';
 import { useDebounced } from './hooks';
+import { BookCover } from './cover';
 
 // Run an async action; ignores re-entry while it runs (double-click safe) and reports errors as a toast.
 export function useAction(fn) {
@@ -34,12 +35,12 @@ export function Modal({ title, wide = false, onClose, children }) {
   useEffect(() => { ref.current?.showModal(); }, []);
   return (
     <dialog ref={ref} onClose={onClose} onClick={(e) => { if (e.target === ref.current) ref.current.close(); }}
-      className={`border border-ink bg-sheet text-ink p-0 shadow-hard backdrop:bg-ink/55 ${wide ? 'w-[min(980px,96vw)]' : 'w-[min(560px,94vw)]'}`}>
-      <div className="flex justify-between items-center px-3 py-1.5 border-b border-ink bg-tint sticky top-0 z-10">
-        <h2 className="!mb-0">{title}</h2>
+      className={`border border-line bg-sheet text-ink p-0 shadow-dialog backdrop:bg-ink/55 ${wide ? 'w-[min(980px,96vw)]' : 'w-[min(560px,94vw)]'}`}>
+      <div className="flex justify-between items-center px-5 py-3 border-b border-line bg-sheet sticky top-0 z-10">
+        <h2 className="!mb-0 !text-[1.5rem]">{title}</h2>
         <button className="px-2 text-lg leading-none hover:bg-ink hover:text-paper" aria-label="Close" onClick={() => ref.current.close()}>✕</button>
       </div>
-      <div className="p-3 max-h-[80vh] overflow-y-auto">{children}</div>
+      <div className="px-5 py-4 max-h-[80vh] overflow-y-auto">{children}</div>
     </dialog>
   );
 }
@@ -70,9 +71,9 @@ export function Async({ state, children }) {
 }
 
 export const PageTitle = ({ children, actions }) => (
-  <div className="flex flex-wrap justify-between items-end gap-2 mb-2.5 border-b-2 border-ink">
-    <h1 className="!border-0 !mb-0 pb-1.5">{children}</h1>
-    <div className="pb-1.5 flex gap-1.5">{actions}</div>
+  <div className="flex flex-wrap justify-between items-end gap-3 mb-6 pb-4 border-b border-ink/30">
+    <h1>{children}</h1>
+    <div className="flex gap-2 pb-1">{actions}</div>
   </div>
 );
 
@@ -112,18 +113,21 @@ export function BookPicker({ onPick, placeholder = 'Search title, author or ISBN
       <input type="search" className="input picker-q" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
         placeholder={placeholder} autoComplete="off" autoFocus={autoFocus} aria-label="Search books" />
       {dq ? (
-        <div className="mt-1.5 max-h-[56vh] overflow-y-auto border border-ink border-b-0">
-          {items.length === 0 && <div className="p-3 text-center text-muted border-b border-ink">No books match “{dq}”.</div>}
+        <div className="mt-1.5 max-h-[56vh] overflow-y-auto border border-line border-b-0">
+          {items.length === 0 && <div className="p-3 text-center text-muted border-b border-line">No books match “{dq}”.</div>}
           {items.map((b) => (
             <button type="button" key={b.id} onClick={() => pick(b)}
-              className={`result group w-full grid grid-cols-[1fr_auto] gap-x-3 text-left px-2 py-1 border-0 border-b border-ink bg-sheet hover:bg-ink hover:text-paper ${showStock && b.availableQty <= 0 ? 'opacity-60' : ''}`}>
-              <span className="font-serif font-bold">{b.title}{b.edition && <em className="font-normal"> ({b.edition})</em>}</span>
-              <span className="row-span-2 text-right font-mono text-[.82rem] flex flex-col">
-                <strong>{fmt(b.priceCents)}</strong>
-                {showStock && <span className={b.availableQty <= 0 ? 'text-brick group-hover:text-paper' : b.isLowStock ? 'text-ochre group-hover:text-paper' : ''}>{b.availableQty} in stock{b.reservedQty ? ` (${b.reservedQty} reserved)` : ''}</span>}
-                <span className="text-muted group-hover:text-paper font-sans">{b.location || 'No location set'}</span>
+              className={`result group w-full grid grid-cols-[auto_1fr_auto] gap-x-3 items-center text-left px-3 py-2 border-0 border-b border-line bg-sheet transition-colors duration-200 hover:bg-tint ${showStock && b.availableQty <= 0 ? 'opacity-60' : ''}`}>
+              <BookCover book={b} w={34} className="row-span-1" />
+              <span className="min-w-0">
+                <span className="block font-serif font-bold leading-snug">{b.title}{b.edition && <em className="font-normal"> ({b.edition})</em>}</span>
+                <span className="block text-muted text-[.82rem]">{b.author}{b.publisher ? ` · ${b.publisher}` : ''}{b.isbn ? <> · ISBN <span className="font-mono">{b.isbn}</span></> : ''}</span>
               </span>
-              <span className="text-muted group-hover:text-paper text-[.82rem]">{b.author}{b.publisher ? ` · ${b.publisher}` : ''}{b.isbn ? <> · ISBN <span className="font-mono">{b.isbn}</span></> : ''}</span>
+              <span className="text-right font-mono text-[.82rem] flex flex-col">
+                <strong>{fmt(b.priceCents)}</strong>
+                {showStock && <span className={b.availableQty <= 0 ? 'text-terracotta' : b.isLowStock ? 'text-ochre' : 'text-muted'}>{b.availableQty} in stock{b.reservedQty ? ` (${b.reservedQty} reserved)` : ''}</span>}
+                <span className="text-muted font-sans">{b.location || 'No location set'}</span>
+              </span>
             </button>
           ))}
         </div>

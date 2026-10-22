@@ -13,8 +13,8 @@ export default function Login() {
   });
   return (
     <div className="max-w-[340px] mx-auto mt-[12vh] px-3">
-      <form className="card shadow-hard !p-4" onSubmit={submit}>
-        <h1>Sign in</h1>
+      <form className="card shadow-dialog !p-4" onSubmit={submit}>
+        <h1 className="!text-[2.2rem] mb-4">Sign in</h1>
         <Field label="Username" htmlFor="u"><input id="u" className="input" value={u} onChange={(e) => setU(e.target.value)} autoComplete="username" autoFocus required /></Field>
         <Field label="Password" htmlFor="p"><input id="p" type="password" className="input" value={p} onChange={(e) => setP(e.target.value)} autoComplete="current-password" required /></Field>
         {err && <div className="notice notice-bad">{err}</div>}

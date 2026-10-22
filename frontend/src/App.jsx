@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
+import { motion } from 'framer-motion';
 import { Navigate, NavLink, Route, Routes, useLocation } from 'react-router-dom';
 import { useAuth } from './lib/auth';
 import { useAction } from './lib/ui';
+import { EASE } from './lib/motion';
 import Login from './pages/Login';
 import Billing from './pages/Billing';
 import Bills from './pages/Bills';
@@ -38,21 +40,25 @@ function Shell({ pages }) {
   const [signOut] = useAction(logout);
   const current = pages.find((p) => p.path === pathname);
   useEffect(() => { document.title = `${current ? current.title + ' · ' : ''}${settings.shopName}`; }, [current, settings.shopName]);
+  const dateLine = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[200px_1fr] md:grid-rows-[auto_1fr] print:block">
-      <aside className="bg-sheet border-r border-ink md:row-span-2 md:sticky md:top-0 md:h-screen overflow-y-auto flex flex-col print:hidden">
-        <NavLink to="/" className="block px-3 py-3 border-b border-ink font-serif font-bold text-[1.05rem] text-ink no-underline">{settings.shopName}</NavLink>
-        <nav aria-label="Main" className="flex md:flex-col flex-wrap md:flex-nowrap">
+    <div className="min-h-screen md:grid md:grid-cols-[220px_1fr] md:grid-rows-[auto_1fr] print:block">
+      <aside className="bg-sheet/60 border-r border-line md:row-span-2 md:sticky md:top-0 md:h-screen overflow-y-auto flex flex-col print:hidden">
+        <NavLink to="/" className="block px-5 pt-6 pb-5 border-b border-line no-underline">
+          <span className="block font-serif italic text-[1.55rem] leading-[1.1] text-ink">{settings.shopName}</span>
+          <span className="block mt-1.5 text-[.62rem] uppercase tracking-[.22em] text-muted">Bookshop ledger</span>
+        </NavLink>
+        <nav aria-label="Main" className="flex md:flex-col flex-wrap md:flex-nowrap py-2">
           {GROUPS.map((g) => {
             const items = pages.filter((p) => p.group === g);
             if (!items.length) return null;
             return (
-              <div key={g} className="contents md:block md:border-t md:border-hair first:md:border-t-0">
-                <div className="hidden md:block text-[.7rem] tracking-[.1em] uppercase text-muted px-3 pt-2.5 pb-0.5">{g}</div>
+              <div key={g} className="contents md:block md:mt-3">
+                <div className="hidden md:block text-[.62rem] font-semibold tracking-[.2em] uppercase text-muted px-5 pb-1">{g}</div>
                 {items.map((p) => (
                   <NavLink key={p.path} to={p.path}
-                    className={({ isActive }) => `block px-3 py-1 text-ink no-underline border-l-[3px] hover:bg-ink hover:text-paper ${isActive ? 'bg-tint border-ink font-bold' : 'border-transparent'}`}>
+                    className={({ isActive }) => `block px-5 py-1.5 no-underline border-l-2 transition-colors duration-300 ${isActive ? 'border-terracotta text-ink font-medium bg-tint/60' : 'border-transparent text-muted hover:text-ink'}`}>
                     {p.title}
                   </NavLink>
                 ))}
@@ -61,16 +67,18 @@ function Shell({ pages }) {
           })}
         </nav>
       </aside>
-      <header className="flex items-center justify-between gap-3 px-3.5 py-1.5 bg-sheet border-b border-ink md:sticky md:top-0 z-20 print:hidden">
-        <span className="font-serif font-bold">{current?.title}</span>
-        <span className="text-muted whitespace-nowrap">{user.fullName} ({user.role}) · <button className="btn btn-link" onClick={signOut}>Sign out</button></span>
+      <header className="flex items-center justify-between gap-3 px-8 py-3 border-b border-line md:sticky md:top-0 z-20 bg-paper/95 print:hidden">
+        <span className="text-[.68rem] uppercase tracking-[.18em] text-muted">{dateLine}</span>
+        <span className="text-muted whitespace-nowrap text-[.9rem]">{user.fullName} <span className="text-[.7rem] uppercase tracking-wider">({user.role})</span> · <button className="btn btn-link" onClick={signOut}>Sign out</button></span>
       </header>
-      <main className="p-3.5 min-w-0 max-w-[1400px] w-full outline-none print:p-0">
-        <Routes>
-          {pages.map((p) => <Route key={p.path} path={p.path} element={p.el} />)}
-          <Route path="/receipt/:id" element={<Receipt />} />
-          <Route path="*" element={<Navigate to={isOwner ? '/dashboard' : '/billing'} replace />} />
-        </Routes>
+      <main className="px-5 md:px-10 py-7 min-w-0 max-w-[1400px] w-full outline-none print:p-0">
+        <motion.div key={pathname} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, ease: EASE }}>
+          <Routes>
+            {pages.map((p) => <Route key={p.path} path={p.path} element={p.el} />)}
+            <Route path="/receipt/:id" element={<Receipt />} />
+            <Route path="*" element={<Navigate to={isOwner ? '/dashboard' : '/billing'} replace />} />
+          </Routes>
+        </motion.div>
       </main>
     </div>
   );

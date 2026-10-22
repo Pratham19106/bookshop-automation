@@ -4,7 +4,7 @@ An integrated system for running a single physical bookshop: catalogue and shelf
 inventory, rule-based restocking recommendations, suppliers and purchasing, a sales/expenses dashboard, and phone-in orders.
 
 - **backend/** – Node.js + Express REST API, SQLite (better-sqlite3), all business rules, migrations, tests
-- **frontend/** – React + Tailwind CSS single-page app (Vite), "Utilitarian Archivist" design: paper and ink palette, serif headings, monospace figures, hard 1px borders, ledger-style tables
+- **frontend/** – React + Tailwind CSS + Framer Motion single-page app (Vite), "Editorial Artisanal" design: warm paper and charcoal with sage, terracotta and slate accents, Playfair Display headings over Inter data, generated book covers, 1px rules and a faint paper grain
 - **docs/** – requirements checklist, architecture, operations guide
 
 ## Quick start

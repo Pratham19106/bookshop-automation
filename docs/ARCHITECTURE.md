@@ -34,9 +34,14 @@ In production the API serves the built `frontend/dist` itself (one origin, so th
 | `src/lib/` | `api.js` (fetch wrapper), `ui.jsx` (Modal, Button, BookPicker, Badge...), `overlays.jsx` (toasts, confirm), `auth.jsx`, `format.js`, `hooks.js` |
 | `tailwind.config.js`, `src/index.css` | design tokens and shared component classes |
 
-Design rules ("Utilitarian Archivist"): off-white paper background, near-black ink, 1px solid black borders instead of spacing or shadows, sharp corners,
-flat buttons that invert on hover, serif for headings and titles, monospace for every number/ISBN/price, no blur, no animation. Fonts are bundled (no external requests).
-React escapes all rendered text, so catalogue data cannot inject markup.
+Design ("Editorial Artisanal"): warm off-white paper with charcoal ink; accents taken from physical materials (sage, terracotta, slate); Playfair Display for headlines and
+book titles, Inter (tabular numerals) for all data; fine 1px rules separate sections instead of boxes; tables are ruled ledgers; a faint SVG grain overlays the page.
+No glass, blur or neon. Fonts are bundled (no external requests). React escapes all rendered text, so catalogue data cannot inject markup.
+
+- **Book covers** (`lib/cover.jsx`): there is no cover art in the data, so each book gets a stable generated cover (colour and layout derived from title and author) drawn as a physical
+  object, with spine shading, a page-edge highlight and a layered contact shadow. Swapping in real cover images later means changing only this component.
+- **Motion** (`lib/motion.jsx`, Framer Motion): slow fades with a few pixels of drift, staggered list loads, and the dashboard sales line that draws itself. No springs or bounce, and
+  `MotionConfig reducedMotion="user"` disables movement for people who request reduced motion.
 
 ## Data integrity decisions
 
