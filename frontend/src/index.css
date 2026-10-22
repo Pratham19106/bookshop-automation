@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { font-size: 14px; }
+  body { @apply bg-paper text-ink font-sans; }
+  h1, h2, h3 { @apply font-serif font-bold; }
+  h1 { @apply text-[1.35rem] mb-2.5 pb-1.5 border-b-2 border-ink; }
+  h2 { @apply text-[1.05rem] mb-1.5; }
+  h3 { @apply text-[.95rem] mt-3.5 mb-1 pb-0.5 border-b border-ink; }
+  a { @apply text-navy; }
+  [hidden] { display: none !important; }
+  :focus-visible { outline: 2px solid #2F4A6B; outline-offset: 1px; }
+  label { @apply block text-[.72rem] uppercase tracking-wider text-muted mb-px; }
+  input[type="checkbox"] { @apply w-3.5 h-3.5 align-[-2px]; accent-color: #1A1A1A; }
+}
+
+@layer components {
+  .btn { @apply inline-block px-3 py-1 border border-ink bg-sheet text-ink cursor-pointer no-underline hover:bg-ink hover:text-paper disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sheet disabled:hover:text-ink; }
+  .btn-primary { @apply bg-ink text-paper font-bold hover:bg-paper hover:text-ink disabled:hover:bg-ink disabled:hover:text-paper; }
+  .btn-danger { @apply text-brick border-brick hover:bg-brick hover:text-white; }
+  .btn-sm { @apply px-1.5 py-px text-[.82rem]; }
+  .btn-link { @apply border-0 bg-transparent p-0 text-navy underline hover:bg-transparent hover:text-ink; }
+  .input { @apply w-full px-1.5 py-1 border border-ink bg-sheet text-ink; }
+  .input-sm { @apply w-20; }
+  .field { @apply mb-2; }
+  .card { @apply bg-sheet border border-ink px-3 py-2.5; }
+  .toolbar { @apply flex flex-wrap gap-2 items-end mb-2.5 p-2 bg-sheet border border-ink; }
+  .table-wrap { @apply overflow-x-auto border border-ink bg-sheet; }
+  .ledger { @apply w-full border-collapse text-[.93rem] min-w-[560px]; }
+  .ledger th { @apply px-2 py-[3px] bg-tint border border-hair border-b-ink text-left text-[.7rem] uppercase tracking-wider whitespace-nowrap sticky top-0; }
+  .ledger td { @apply px-2 py-[3px] border border-hair align-top; }
+  .ledger .num { @apply text-right font-mono tabular-nums; }
+  .ledger tr.row-click { @apply cursor-pointer hover:bg-tint; }
+  .ledger td strong { @apply font-serif; }
+  .badge { @apply inline-block px-1.5 text-[.72rem] font-bold uppercase tracking-wide border border-muted text-muted bg-sheet whitespace-nowrap; }
+  .badge-ok { @apply border-olive text-olive; } .badge-warn { @apply border-ochre text-ochre; }
+  .badge-bad { @apply border-brick text-brick; } .badge-info { @apply border-navy text-navy; }
+  .badge-critical { @apply bg-brick border-brick text-white; }
+  .notice { @apply px-2.5 py-1.5 border border-navy border-l-4 bg-sheet mb-2 text-[.9rem]; }
+  .notice-warn { @apply border-ochre; } .notice-bad { @apply border-brick; }
+  .empty { @apply p-4 text-center text-muted border border-dashed border-muted bg-sheet; }
+  .error-box { @apply px-3 py-2.5 border border-brick border-l-4 bg-sheet text-brick; }
+  .tiles { @apply grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] mb-3 border-t border-l border-ink bg-sheet; }
+  .tile { @apply px-3 py-2 border-r border-b border-ink; }
+  .tile-k { @apply text-muted text-[.72rem] uppercase tracking-widest; }
+  .tile-v { @apply font-mono text-[1.3rem] font-bold; }
+  .tile-s { @apply text-muted text-[.78rem]; }
+  .sum { @apply ml-auto max-w-[340px] border border-ink px-2.5 py-1 bg-sheet font-mono; }
+  .sum > div { @apply flex justify-between gap-3 py-0.5; }
+  .sum > .grand { @apply text-[1.1rem] font-bold border-t border-ink mt-1 pt-1; }
+  .kv { @apply grid grid-cols-[max-content_1fr] gap-x-3.5 gap-y-0.5 mb-2; }
+  .kv dt { @apply text-muted; } .kv dd { @apply m-0; }
+  .tab { @apply -mr-px; } .tab-active { @apply bg-ink text-paper font-bold; }
+}

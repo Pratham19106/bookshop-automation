@@ -11,5 +11,5 @@ module.exports = {
     : -new Date().getTimezoneOffset(),
   sessionHours: Number(process.env.SESSION_HOURS) || 12,
   secureCookies: process.env.COOKIE_SECURE === '1',
-  publicDir: path.join(root, '..', 'frontend'),
+  publicDir: path.join(root, '..', 'frontend', 'dist'),
 };

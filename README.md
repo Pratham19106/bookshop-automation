@@ -3,18 +3,25 @@
 An integrated system for running a single physical bookshop: catalogue and shelf locations, point-of-sale billing,
 inventory, rule-based restocking recommendations, suppliers and purchasing, a sales/expenses dashboard, and phone-in orders.
 
-- **backend/** – Node.js + Express REST API, SQLite (via better-sqlite3), all business rules, migrations, tests
-- **frontend/** – static single-page UI (plain JavaScript modules + CSS, no build step), served by the backend
+- **backend/** – Node.js + Express REST API, SQLite (better-sqlite3), all business rules, migrations, tests
+- **frontend/** – React + Tailwind CSS single-page app (Vite), "Utilitarian Archivist" design: paper and ink palette, serif headings, monospace figures, hard 1px borders, ledger-style tables
 - **docs/** – requirements checklist, architecture, operations guide
 
 ## Quick start
 
-Requires Node.js 20 or newer.
+Requires Node.js 20 or newer. Run from the project root.
 
 ```
-npm run setup      # install backend dependencies (once)
+npm install        # root tools (concurrently)
+npm run setup      # install backend + frontend dependencies (once)
 npm run seed       # optional: load demo data (about 60 days of sales, suppliers, orders)
-npm run dev        # start the app with auto-restart  ->  http://localhost:3000
+npm run dev        # API on :3000 and web app on :5173  ->  open http://localhost:5173
+```
+
+Production-style run (one process, one port; builds the frontend and serves it from the API):
+
+```
+npm start          # -> http://localhost:3000
 ```
 
 Demo logins (created by `npm run seed`, **demo only**):
@@ -28,25 +35,31 @@ For a real shop skip the seed and create your own owner instead:
 
 ```
 npm --prefix backend run create-owner -- <username> <password> "Full Name"
-npm start
 ```
 
 Migrations are applied automatically on start (`npm --prefix backend run migrate` runs them on their own).
 
-## Commands
+## Tests
+
+| Command | What | Time |
+|---|---|---|
+| `npm test` | 70 backend tests: billing math, stock integrity, concurrency, phone-order lifecycle, purchasing, restocking, dashboard, permissions | ~3 s |
+| `npm run test:ui` | UI smoke test in headless Chrome/Edge: sign in, open all 11 pages, one sale, one phone order, staff restrictions (builds the frontend first) | ~10 s |
+
+Set `CHROME_PATH` if Chrome/Edge is not found automatically. Output is one dot per passing test; a failure prints the reason.
+
+## Other commands
 
 | Command | What it does |
 |---|---|
-| `npm run dev` / `npm start` | run the server (dev restarts on file changes) |
-| `npm test` | 70 backend tests (about 2 s) |
-| `npm --prefix backend run test:e2e` | headless-Chrome UI test against a throwaway seeded database (needs Chrome or Edge; set `CHROME_PATH` if not auto-found) |
+| `npm run build` | build the frontend into `frontend/dist` |
 | `npm --prefix backend run backup` | consistent online backup of the database |
 
 ## Configuration (environment variables)
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `PORT` | 3000 | HTTP port |
+| `PORT` | 3000 | API port |
 | `DB_PATH` | `backend/data/bookshop.db` | SQLite file |
 | `TZ_OFFSET_MINUTES` | server local offset | shop's offset from UTC, used to bucket sales into local days |
 | `SESSION_HOURS` | 12 | login session length |

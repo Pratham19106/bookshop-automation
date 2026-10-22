@@ -1,15 +1,15 @@
 # Requirements and Status
 
 Status words are literal: **Implemented** = code exists; **Tested** = covered by automated tests that pass (70 backend tests);
-**UI-checked** = exercised by the headless-browser test. Anything not listed as tested should be treated as unverified.
+**UI-checked** = exercised by the headless-browser smoke test (`npm run test:ui`). Anything not listed as tested should be treated as unverified.
 
 | # | Requirement | Where | Status |
 |---|---|---|---|
 | 4.1 | Catalogue and physical location | `services/books.js`, `pages/catalogue.js` | Implemented, tested (API), UI-checked (search, add) |
 | 4.2 | Billing interface | `services/sales.js`, `pages/billing.js`, `receipt.html` | Implemented, tested, UI-checked (sale, oversell block, receipt) |
 | 4.3 | Inventory and automatic stock updates | `services/inventory.js` | Implemented, tested |
-| 4.4 | Rule-based restocking | `services/restock.js`, `pages/restock.js` | Implemented, tested (API); UI partly checked |
-| 4.5 | Supplier management | `services/suppliers.js`, `purchasing.js` | Implemented, tested (API); UI not browser-tested |
+| 4.4 | Rule-based restocking | `services/restock.js`, `pages/restock.js` | Implemented, tested (API); page renders in the smoke test |
+| 4.5 | Supplier management | `services/suppliers.js`, `purchasing.js` | Implemented, tested (API); pages render in the smoke test, forms not exercised |
 | 4.6 | Sales and expenses dashboard | `services/dashboard.js`, `pages/dashboard.js` | Implemented, tested against known data; page renders |
 | 4.7 | Phone-in orders | `services/orders.js`, `pages/orders.js` | Implemented, tested, UI-checked (create, ready, complete) |
 
@@ -55,8 +55,8 @@ is derived from a separate payment ledger. Advance payments are not revenue unti
 
 ## Known limitations
 
-- The UI has been checked by an automated browser test only partly (see table); suppliers, purchases, settings and expenses forms have no browser test.
+- The browser smoke test opens every page and drives billing, phone orders and staff restrictions; the supplier, purchase-order, expense and settings forms are not driven by it (only the API behind them is tested).
 - Single-process, single-database design (SQLite). Fine for one shop; not for multi-branch.
 - Login throttling is in-memory and resets on restart. No password-reset email; the owner resets passwords in Settings.
 - No barcode-scanner hardware integration (a scanner that types an ISBN plus Enter works in the search boxes), no online payments, no telephony.
-- There is no automated test for the frontend beyond the browser script; no linting is configured.
+- No linting is configured and there are no component-level frontend tests.
