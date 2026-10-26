@@ -8,6 +8,8 @@ export default {
       colors: {
         paper: '#F5F4F0', sheet: '#FFFFFF', ink: '#1A1A1A', muted: '#5E5B54', hair: '#C9C5B8', tint: '#ECEAE3',
         brick: '#9B2C2C', olive: '#3F6B3A', ochre: '#8A6A12', navy: '#2F4A6B',
+        'paper-cool': '#EFF3F6', 'tint-cool': '#DFE6ED', 'navy-dark': '#182B3F',
+        'navy-light': '#E8EEF5', 'teal': '#236966', 'teal-light': '#E7F3F2', 'slate-cool': '#4E6173',
       },
       fontFamily: {
         serif: ['Merriweather', 'Georgia', 'Times New Roman', 'serif'],

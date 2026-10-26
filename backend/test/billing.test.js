@@ -190,3 +190,19 @@ test('owner can correct stock after a count; reason required; cannot go below re
   await t.asStaff.post('/api/orders', { customerName: 'C', customerPhone: '9999999999', deliveryType: 'pickup', items: [{ bookId: a.id, quantity: 5 }] });
   assert.equal((await t.asOwner.post(`/api/books/${a.id}/adjust`, { countedQty: 3, reason: 'recount' })).status, 409);
 });
+
+test('cash memo endpoints: standalone HTML and Puppeteer PDF render successfully', async () => {
+  const a = await t.addBook({ title: 'Design Patterns', priceCents: 45000 });
+  const res = await sell(t.asStaff, [{ bookId: a.id, quantity: 1 }], { customerName: 'Ramesh Sharma', paymentMethod: 'upi' });
+  const htmlRes = await t.asStaff.get(`/api/sales/${res.body.id}/html`);
+  assert.equal(htmlRes.status, 200);
+  assert.match(htmlRes.text, /Ramesh Sharma/);
+  assert.match(htmlRes.text, /UPI PAID/);
+  assert.match(htmlRes.text, /TOTAL/);
+
+  const pdfRes = await t.asStaff.get(`/api/sales/${res.body.id}/pdf`);
+  assert.equal(pdfRes.status, 200);
+  assert.equal(pdfRes.headers['content-type'], 'application/pdf');
+  assert.match(pdfRes.headers['content-disposition'], /inline; filename="bill-INV-\d+\.pdf"/);
+  assert.ok(pdfRes.text.length > 1000);
+});

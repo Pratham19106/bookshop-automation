@@ -12,6 +12,7 @@ const purchasing = require('./services/purchasing');
 const restock = require('./services/restock');
 const dashboard = require('./services/dashboard');
 const expenses = require('./services/expenses');
+const billPrinter = require('./services/billPrinter');
 
 const idParam = (req, name = 'id') => {
   const n = Number(req.params[name]);
@@ -102,6 +103,29 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
   });
   api.get('/sales', authed, (req, res) => ok(res, sales.listSales(db, tzOffsetMinutes, req.query)));
   api.get('/sales/:id', authed, (req, res) => ok(res, sales.getSale(db, req.user, idParam(req))));
+  api.get('/sales/:id/pdf', authed, async (req, res, next) => {
+    try {
+      const sale = sales.getSale(db, req.user, idParam(req));
+      const shopSettings = settings.getSettings(db);
+      const pdf = await billPrinter.generateBillPdf(sale, shopSettings);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `inline; filename="bill-${sale.billNo}.pdf"`);
+      res.send(pdf);
+    } catch (e) {
+      next(e);
+    }
+  });
+  api.get('/sales/:id/html', authed, (req, res, next) => {
+    try {
+      const sale = sales.getSale(db, req.user, idParam(req));
+      const shopSettings = settings.getSettings(db);
+      const html = billPrinter.renderBillHtml(sale, shopSettings);
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.send(html);
+    } catch (e) {
+      next(e);
+    }
+  });
   api.post('/sales/:id/void', owner, (req, res) => ok(res, sales.voidSale(db, req.user, idParam(req), req.body)));
 
   // ---- phone orders
