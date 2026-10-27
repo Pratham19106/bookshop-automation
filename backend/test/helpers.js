@@ -23,7 +23,7 @@ async function setup({ tz = 0 } = {}) {
       const text = await res.text();
       let json = null;
       try { json = text ? JSON.parse(text) : null; } catch { /* not json */ }
-      return { status: res.status, body: json, text };
+      return { status: res.status, body: json, text, headers: Object.fromEntries(res.headers.entries()) };
     };
     return {
       get: (p) => call('GET', p),

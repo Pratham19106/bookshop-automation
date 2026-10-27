@@ -3,18 +3,16 @@
 @tailwind utilities;
 
 @layer base {
-  html { font-size: 14.5px; }
-  body { @apply bg-paper text-ink font-sans antialiased; }
-  /* very subtle paper grain over everything; never intercepts clicks */
-  body::before {
-    content: ''; position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: .07; mix-blend-mode: multiply;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .17 0 0 0 0 .16 0 0 0 0 .14 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  html {
+    font-size: 14px;
+    scroll-behavior: smooth;
   }
-  h1, h2, h3 { @apply font-serif; }
-  h1 { @apply text-[2.6rem] leading-[1.05] font-normal tracking-tight; }
-  h2 { @apply text-[1.35rem] leading-tight font-normal mb-2; }
-  h3 { @apply font-sans text-[.68rem] font-semibold uppercase tracking-[.14em] text-muted mt-5 mb-2 pb-1 border-b border-line; }
-  a { @apply text-slate underline decoration-slate/40 underline-offset-2 hover:decoration-slate; }
+  body { @apply bg-paper text-ink font-sans; }
+  h1, h2, h3 { @apply font-serif font-bold; }
+  h1 { @apply text-[1.35rem] mb-2.5 pb-1.5 border-b-2 border-ink; }
+  h2 { @apply text-[1.05rem] mb-1.5; }
+  h3 { @apply text-[.95rem] mt-3.5 mb-1 pb-0.5 border-b border-ink; }
+  a { @apply text-navy; }
   [hidden] { display: none !important; }
   :focus-visible { outline: 2px solid #4F5D68; outline-offset: 2px; }
   label { @apply block text-[.68rem] font-semibold uppercase tracking-[.12em] text-muted mb-1; }
@@ -24,42 +22,42 @@
 }
 
 @layer components {
-  .btn { @apply inline-block px-3.5 py-1.5 rounded-sm border border-ink/30 bg-sheet text-ink cursor-pointer no-underline transition-colors duration-300 hover:bg-ink hover:text-paper hover:border-ink disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sheet disabled:hover:text-ink; }
-  .btn-primary { @apply bg-ink text-paper border-ink font-medium hover:bg-terracotta hover:border-terracotta disabled:hover:bg-ink disabled:hover:text-paper; }
-  .btn-danger { @apply text-terracotta border-terracotta/50 hover:bg-terracotta hover:text-paper hover:border-terracotta; }
-  .btn-sm { @apply px-2 py-0.5 text-[.8rem]; }
-  .btn-link { @apply border-0 bg-transparent p-0 text-slate underline hover:bg-transparent hover:text-ink; }
-  .input { @apply w-full px-2 py-1.5 rounded-sm border border-ink/25 bg-sheet text-ink transition-colors duration-200 focus:border-slate; }
-  .field { @apply mb-3; }
-  .card { @apply bg-sheet border border-line rounded-sm p-4 shadow-paper; }
-  .toolbar { @apply flex flex-wrap gap-x-5 gap-y-2 items-end mb-5 pb-4 border-b border-line; }
-  .table-wrap { @apply overflow-x-auto bg-sheet border border-line rounded-sm shadow-paper; }
-  .ledger { @apply w-full border-collapse text-[.92rem] min-w-[560px]; }
-  .ledger th { @apply px-3 py-2 text-left text-[.66rem] font-semibold uppercase tracking-[.13em] text-muted whitespace-nowrap bg-sheet border-b border-ink/30 sticky top-0; }
-  .ledger td { @apply px-3 py-2 border-b border-hair align-middle; }
-  .ledger tbody tr:last-child td { @apply border-b-0; }
-  .ledger .num { @apply text-right font-mono; }
-  .ledger tr.row-click { @apply cursor-pointer transition-colors duration-200 hover:bg-tint/70; }
-  .ledger td strong { @apply font-serif font-bold text-[1.02em]; }
-  .badge { @apply inline-block px-2 py-px rounded-full text-[.66rem] font-semibold uppercase tracking-wider border border-muted/40 text-muted bg-tint/60 whitespace-nowrap; }
-  .badge-ok { @apply border-sage/40 text-sage bg-sage/10; } .badge-warn { @apply border-ochre/40 text-ochre bg-ochre/10; }
-  .badge-bad { @apply border-terracotta/40 text-terracotta bg-terracotta/10; } .badge-info { @apply border-slate/40 text-slate bg-slate/10; }
-  .badge-critical { @apply bg-terracotta border-terracotta text-paper; }
-  .notice { @apply px-3 py-2 border-l-[3px] border-slate bg-sheet mb-3 text-[.9rem] shadow-paper; }
-  .notice-warn { @apply border-ochre; } .notice-bad { @apply border-terracotta; }
-  .empty { @apply p-6 text-center text-muted border border-dashed border-line bg-sheet/60 rounded-sm font-serif italic; }
-  .error-box { @apply px-3 py-2.5 border-l-[3px] border-terracotta bg-sheet text-terracotta; }
-  .tiles { @apply grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-x-8 gap-y-5 mb-6; }
-  .tile { @apply border-t border-ink/30 pt-2; }
-  .tile-k { @apply text-muted text-[.66rem] font-semibold uppercase tracking-[.14em]; }
-  .tile-v { @apply font-mono text-[1.65rem] leading-tight font-medium mt-0.5; }
-  .tile-s { @apply text-muted text-[.78rem] mt-0.5; }
-  .sum { @apply ml-auto max-w-[340px] font-mono; }
-  .sum > div { @apply flex justify-between gap-3 py-1 border-b border-hair; }
-  .sum > .grand { @apply font-serif text-[1.35rem] border-b-0 border-t border-ink/40 mt-1 pt-2; }
-  .kv { @apply grid grid-cols-[max-content_1fr] gap-x-5 gap-y-1 mb-3; }
+  .btn { @apply inline-block px-3 py-1 border border-ink bg-sheet text-ink cursor-pointer no-underline hover:bg-ink hover:text-paper disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-sheet disabled:hover:text-ink transition-colors duration-100; }
+  .btn-primary { @apply bg-ink text-paper font-bold hover:bg-paper hover:text-ink disabled:hover:bg-ink disabled:hover:text-paper; }
+  .btn-danger { @apply text-brick border-brick hover:bg-brick hover:text-white; }
+  .btn-sm { @apply px-1.5 py-px text-[.82rem]; }
+  .btn-link { @apply border-0 bg-transparent p-0 text-navy underline hover:bg-transparent hover:text-ink; }
+  .input { @apply w-full px-1.5 py-1 border border-ink bg-sheet text-ink; }
+  .input-sm { @apply w-20; }
+  .field { @apply mb-2; }
+  .card { @apply bg-sheet border border-ink px-3 py-2.5; }
+  .toolbar { @apply flex flex-wrap gap-2 items-end mb-2.5 p-2 bg-sheet border border-ink; }
+  .table-wrap { @apply overflow-x-auto border border-ink bg-sheet; }
+  .ledger { @apply w-full border-collapse text-[.93rem] min-w-[560px]; }
+  .ledger th { @apply px-2 py-[3px] bg-tint border border-hair border-b-ink text-left text-[.7rem] uppercase tracking-wider whitespace-nowrap sticky top-0; }
+  .ledger td { @apply px-2 py-[3px] border border-hair align-top; }
+  .ledger .num { @apply text-right font-mono tabular-nums; }
+  .ledger tr.row-click { @apply cursor-pointer hover:bg-tint; }
+  .ledger td strong { @apply font-serif; }
+  .badge { @apply inline-block px-1.5 text-[.72rem] font-bold uppercase tracking-wide border border-muted text-muted bg-sheet whitespace-nowrap; }
+  .badge-ok { @apply border-olive text-olive; } .badge-warn { @apply border-ochre text-ochre; }
+  .badge-bad { @apply border-brick text-brick; } .badge-info { @apply border-navy text-navy; }
+  .badge-critical { @apply bg-brick border-brick text-white; }
+  .notice { @apply px-2.5 py-1.5 border border-navy border-l-4 bg-sheet mb-2 text-[.9rem]; }
+  .notice-warn { @apply border-ochre; } .notice-bad { @apply border-brick; }
+  .empty { @apply p-4 text-center text-muted border border-dashed border-muted bg-sheet; }
+  .error-box { @apply px-3 py-2.5 border border-brick border-l-4 bg-sheet text-brick; }
+  .tiles { @apply grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] mb-3 border-t border-l border-ink bg-sheet; }
+  .tile { @apply px-3 py-2 border-r border-b border-ink; }
+  .tile-k { @apply text-muted text-[.72rem] uppercase tracking-widest; }
+  .tile-v { @apply font-mono text-[1.3rem] font-bold; }
+  .tile-s { @apply text-muted text-[.78rem]; }
+  .sum { @apply ml-auto max-w-[340px] border border-ink px-2.5 py-1 bg-sheet font-mono; }
+  .sum > div { @apply flex justify-between gap-3 py-0.5; }
+  .sum > .grand { @apply text-[1.1rem] font-bold border-t border-ink mt-1 pt-1; }
+  .kv { @apply grid grid-cols-[max-content_1fr] gap-x-3.5 gap-y-0.5 mb-2; }
   .kv dt { @apply text-muted; } .kv dd { @apply m-0; }
-  .tab { @apply -mr-px first:rounded-l-sm last:rounded-r-sm; } .tab-active { @apply bg-ink text-paper border-ink; }
+  .tab { @apply -mr-px; } .tab-active { @apply bg-ink text-paper font-bold; }
 
   /* A physical book: spine shading on the left, page-block edge on the right, contact shadow on the surface below. */
   .cover { @apply relative shrink-0 overflow-hidden rounded-r-[3px] rounded-l-[1px] text-paper; aspect-ratio: 2 / 3;
@@ -67,4 +65,126 @@
   .cover::before { content: ''; position: absolute; inset: 0; pointer-events: none;
     background: linear-gradient(90deg, rgba(0,0,0,.34) 0, rgba(255,255,255,.14) 5%, rgba(0,0,0,.10) 9%, transparent 16%, transparent 92%, rgba(0,0,0,.14) 100%); }
   .cover::after { content: ''; position: absolute; inset: 0; pointer-events: none; background: linear-gradient(160deg, rgba(255,255,255,.14), transparent 45%, rgba(0,0,0,.14)); }
+
+  /* Animation utilities */
+  .animate-stamp {
+    animation: stampIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  }
+  .animate-slide-up {
+    animation: slideUp 0.4s ease-out forwards;
+  }
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+  .animate-cursor {
+    animation: blink 1s step-end infinite;
+  }
+
+  /* Help highlight pulse */
+  .help-highlighted {
+    animation: helpPulse 2s ease-out;
+    border-color: #2F4A6B !important;
+    box-shadow: 4px 4px 0 #2F4A6B !important;
+  }
+
+  /* Marquee / Rolling Text Animation */
+  .marquee-track {
+    display: flex;
+    overflow: hidden;
+    user-select: none;
+    white-space: nowrap;
+  }
+  .marquee-content {
+    display: flex;
+    flex-shrink: 0;
+    min-width: 100%;
+    animation: scrollText 28s linear infinite;
+  }
+  .marquee-content-reverse {
+    display: flex;
+    flex-shrink: 0;
+    min-width: 100%;
+    animation: scrollTextReverse 28s linear infinite;
+  }
+  .marquee-track:hover .marquee-content,
+  .marquee-track:hover .marquee-content-reverse {
+    animation-play-state: paused;
+  }
+
+  /* Modern Neo-Brutalist Colored Shadows */
+  .neo-shadow-black {
+    box-shadow: 5px 5px 0 #1A1A1A;
+  }
+  .neo-shadow-indigo {
+    box-shadow: 5px 5px 0 #4338CA;
+  }
+  .neo-shadow-emerald {
+    box-shadow: 5px 5px 0 #065F46;
+  }
+  .neo-shadow-amber {
+    box-shadow: 5px 5px 0 #B45309;
+  }
+  .neo-shadow-rose {
+    box-shadow: 5px 5px 0 #BE123C;
+  }
+  .neo-shadow-cyan {
+    box-shadow: 5px 5px 0 #0E7490;
+  }
+  .neo-shadow-purple {
+    box-shadow: 5px 5px 0 #6D28D9;
+  }
+}
+
+@keyframes scrollText {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@keyframes scrollTextReverse {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes stampIn {
+  0% {
+    opacity: 0;
+    transform: scale(1.04) translateY(-4px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+@keyframes helpPulse {
+  0% {
+    background-color: #E8EEF5;
+  }
+  50% {
+    background-color: #E8EEF5;
+  }
+  100% {
+    background-color: #FFFFFF;
+  }
 }
