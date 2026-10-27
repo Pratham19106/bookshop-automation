@@ -87,9 +87,11 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
     includeInactive: req.query.inactive === '1', limit: req.query.limit, offset: req.query.offset,
   })));
   api.get('/books/genres', authed, (req, res) => ok(res, books.genres(db)));
+  api.post('/books/batch-location', authed, (req, res) => ok(res, books.batchAssignLocation(db, req.user, req.body)));
   api.get('/books/:id', authed, (req, res) => ok(res, books.get(db, req.user, idParam(req))));
   api.post('/books', authed, (req, res) => ok(res, books.create(db, req.user, req.body), 201));
   api.put('/books/:id', authed, (req, res) => ok(res, books.update(db, req.user, idParam(req), req.body)));
+  api.put('/books/:id/location', authed, (req, res) => ok(res, books.setLocation(db, req.user, idParam(req), req.body)));
   api.post('/books/:id/active', owner, (req, res) => ok(res, books.setActive(db, req.user, idParam(req), !!(req.body && req.body.active))));
   api.get('/books/:id/movements', authed, (req, res) => ok(res, inventory.movements(db, idParam(req), req.query.limit)));
   api.post('/books/:id/adjust', owner, (req, res) => ok(res, inventory.adjustStock(db, req.user, idParam(req), req.body)));

@@ -154,4 +154,36 @@ function setActive(db, user, id, active) {
   });
 }
 
-module.exports = { search, get, genres, create, update, setActive, locationText };
+// Fast shelf relocation / batch placement for the Floor & Shelves designer
+function setLocation(db, user, id, input) {
+  v.object(input);
+  const aisle = v.str(input.aisle, 'aisle', { max: 30, required: false }) || '';
+  const rack = v.str(input.rack, 'rack', { max: 30, required: false }) || '';
+  const shelf = v.str(input.shelf, 'shelf', { max: 30, required: false }) || '';
+  return tx(db, () => {
+    const book = db.prepare('SELECT id FROM books WHERE id = ?').get(id);
+    if (!book) throw notFound('Book');
+    db.prepare('UPDATE books SET aisle = ?, rack = ?, shelf = ?, updated_at = ? WHERE id = ?')
+      .run(aisle, rack, shelf, new Date().toISOString(), id);
+    return get(db, user, id);
+  });
+}
+
+function batchAssignLocation(db, user, input) {
+  v.object(input);
+  const aisle = v.str(input.aisle, 'aisle', { max: 30, required: false }) || '';
+  const rack = v.str(input.rack, 'rack', { max: 30, required: false }) || '';
+  const shelf = v.str(input.shelf, 'shelf', { max: 30, required: false }) || '';
+  const bookIds = v.array(input.bookIds, 'bookIds', { min: 1, max: 1000 });
+  return tx(db, () => {
+    const stmt = db.prepare('UPDATE books SET aisle = ?, rack = ?, shelf = ?, updated_at = ? WHERE id = ?');
+    const now = new Date().toISOString();
+    for (const rawId of bookIds) {
+      const id = v.int(rawId, 'bookId', { min: 1 });
+      stmt.run(aisle, rack, shelf, now, id);
+    }
+    return { ok: true, count: bookIds.length, aisle, rack, shelf };
+  });
+}
+
+module.exports = { search, get, genres, create, update, setActive, locationText, setLocation, batchAssignLocation };

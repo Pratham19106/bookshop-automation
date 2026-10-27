@@ -17,6 +17,7 @@ import Settings from './pages/Settings';
 import Receipt from './pages/Receipt';
 import Landing from './pages/Landing';
 import Help from './pages/Help';
+import Shelves from './pages/Shelves';
 
 // path -> sidebar group, title, component, owner-only flag
 const PAGES = [
@@ -25,6 +26,7 @@ const PAGES = [
   { path: '/orders', group: 'Sales', title: 'Phone Orders', el: <Orders /> },
   { path: '/catalogue', group: 'Stock', title: 'Catalogue', el: <Catalogue /> },
   { path: '/inventory', group: 'Stock', title: 'Inventory', el: <Inventory /> },
+  { path: '/shelves', group: 'Stock', title: 'Floor & Shelves', el: <Shelves /> },
   { path: '/restock', group: 'Stock', title: 'Restocking', el: <Restock />, owner: true },
   { path: '/suppliers', group: 'Stock', title: 'Suppliers', el: <Suppliers />, owner: true },
   { path: '/purchases', group: 'Stock', title: 'Purchases', el: <Purchases />, owner: true },
@@ -39,7 +41,7 @@ const GROUPS = ['Sales', 'Stock', 'Reports', 'Admin', 'Documentation'];
 function getSectionId(pathname) {
   const seg = pathname.replace(/^\//, '').split('/')[0];
   if (seg === 'receipt') return 'billing';
-  if (['billing', 'bills', 'orders', 'catalogue', 'inventory', 'restock', 'suppliers', 'purchases', 'dashboard', 'expenses', 'settings'].includes(seg)) {
+  if (['billing', 'bills', 'orders', 'catalogue', 'inventory', 'shelves', 'restock', 'suppliers', 'purchases', 'dashboard', 'expenses', 'settings'].includes(seg)) {
     return seg;
   }
   return null;
