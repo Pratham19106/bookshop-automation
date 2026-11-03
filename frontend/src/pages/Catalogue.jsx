@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { get, post, put, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { BookCover } from '../lib/cover';
+import { MotionTr } from '../lib/motion';
 import { fmt, fmtDateTime, money, parseMoney } from '../lib/format';
 import { useDebounced, useLoad } from '../lib/hooks';
 import { confirmBox, toast } from '../lib/overlays';
@@ -90,7 +92,9 @@ export function BookDetail({ id, onClose, onChange }) {
         <Async state={st}>
           {({ book: b, moves, sup }) => (
             <>
-              <dl className="kv">
+              <div className="flex gap-7 items-start mb-2">
+              <BookCover book={b} w={130} className="mt-1" />
+              <dl className="kv flex-1">
                 <dt>Author</dt><dd>{b.author}</dd>
                 <dt>Edition</dt><dd>{b.edition || '—'}{b.publisher && ` · ${b.publisher}`}</dd>
                 <dt>ISBN</dt><dd className="font-mono">{b.isbn || '—'}</dd>
@@ -102,6 +106,7 @@ export function BookDetail({ id, onClose, onChange }) {
                   <span className="text-muted text-[.85rem]"> (alert at {b.lowStockThreshold}{b.thresholdIsDefault ? ', shop default' : ''})</span></dd>
                 <dt>Status</dt><dd>{b.active ? <Badge kind="ok">active</Badge> : <Badge kind="bad">retired</Badge>}</dd>
               </dl>
+              </div>
               <div className="flex flex-wrap gap-1.5">
                 <button className="btn" onClick={() => setSub('edit')}>Edit details</button>
                 {isOwner && <button className="btn" onClick={() => setSub('adjust')}>Correct stock…</button>}
@@ -181,8 +186,8 @@ export default function Catalogue() {
         <div className="flex-1 min-w-[200px]"><label htmlFor="q">Search title, author, ISBN, publisher</label><input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} autoFocus /></div>
         <div><label htmlFor="genre">Genre</label>
           <select id="genre" className="input" value={genre} onChange={(e) => setGenre(e.target.value)}><option value="">All</option>{(genres.data || []).map((g) => <option key={g}>{g}</option>)}</select></div>
-        <label className="!normal-case !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} /> Low stock only</label>
-        {isOwner && <label className="!normal-case !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} /> Show retired</label>}
+        <label className="!normal-case !font-normal !tracking-normal !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} /> Low stock only</label>
+        {isOwner && <label className="!normal-case !font-normal !tracking-normal !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} /> Show retired</label>}
       </div>
       <Async state={st}>
         {(r) => r.items.length === 0 ? <Empty>No books found. {q && 'Try fewer words, or '}<button className="btn btn-link" onClick={() => setAdding(true)}>add a new book</button>.</Empty> : (
@@ -191,16 +196,16 @@ export default function Catalogue() {
               <table className="ledger">
                 <thead><tr><th>Title</th><th>Author</th><th>ISBN</th><th className="num">Price</th><th className="num">In stock</th><th>Location</th></tr></thead>
                 <tbody>
-                  {r.items.map((b) => (
-                    <tr key={b.id} className="row-click" onClick={() => setOpen(b.id)}>
-                      <td><strong>{b.title}</strong>{b.edition && <em className="text-muted"> ({b.edition})</em>} {!b.active && <Badge kind="bad">retired</Badge>}
-                        <div className="text-muted text-[.8rem]">{b.publisher}</div></td>
+                  {r.items.map((b, i) => (
+                    <MotionTr i={i} key={b.id} className="row-click" onClick={() => setOpen(b.id)}>
+                      <td><div className="flex gap-3 items-center"><BookCover book={b} w={38} /><div><strong>{b.title}</strong>{b.edition && <em className="text-muted"> ({b.edition})</em>} {!b.active && <Badge kind="bad">retired</Badge>}
+                        <div className="text-muted text-[.8rem]">{b.publisher}</div></div></div></td>
                       <td>{b.author}</td>
                       <td className="font-mono text-[.85rem] whitespace-nowrap">{b.isbn || <span className="text-muted">none</span>}</td>
                       <td className="num">{fmt(b.priceCents)}</td>
                       <td className="num"><span className={b.availableQty <= 0 ? 'text-brick' : b.isLowStock ? 'text-ochre' : ''}>{b.availableQty}</span>{b.reservedQty > 0 && <div className="text-muted text-[.8rem] font-sans">{b.reservedQty} reserved</div>}</td>
                       <td><Loc b={b} /></td>
-                    </tr>
+                    </MotionTr>
                   ))}
                 </tbody>
               </table>

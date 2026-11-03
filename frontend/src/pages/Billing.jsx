@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
+import { BookCover } from '../lib/cover';
 import { fmt, uuid } from '../lib/format';
 import { confirmBox, fail, toast } from '../lib/overlays';
 import { Actions, BookPicker, Button, Field, Modal, PageTitle } from '../lib/ui';
@@ -396,13 +397,8 @@ export default function Billing() {
                   <tbody>
                     {cart.map(({ book, quantity }) => (
                       <tr key={book.id}>
-                        <td>
-                          <strong>{book.title}</strong>
-                          {book.edition && <em className="text-muted"> ({book.edition})</em>}
-                          <div className="text-muted text-[.8rem]">
-                            {book.location || 'No location'} · {book.availableQty} available
-                          </div>
-                        </td>
+                        <td><div className="flex gap-3 items-center"><BookCover book={book} w={32} /><div><strong>{book.title}</strong>{book.edition && <em className="text-muted"> ({book.edition})</em>}
+                          <div className="text-muted text-[.8rem]">{book.location || 'No location'} · {book.availableQty} available</div></div></div></td>
                         <td className="num">{fmt(book.priceCents)}</td>
                         <td>
                           <span className="inline-flex items-center gap-0.5">

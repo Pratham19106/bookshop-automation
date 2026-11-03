@@ -32,10 +32,10 @@ export function Overlays() {
     <>
       <div className="fixed right-3 bottom-3 z-[100] flex flex-col gap-1.5 max-w-[min(420px,92vw)]" aria-live="polite">
         {toasts.map((t) => (
-          <div key={t.id} className={`px-3 py-2 text-paper border shadow-hard-sm ${t.kind === 'bad' ? 'bg-brick border-brick' : 'bg-ink border-ink'}`}>{t.message}</div>
+          <div key={t.id} className={`px-3 py-2 text-paper border shadow-paper ${t.kind === 'bad' ? 'bg-brick border-brick' : 'bg-ink border-line'}`}>{t.message}</div>
         ))}
       </div>
-      <dialog ref={ref} onCancel={() => ask && answer(false)} className="border border-ink bg-sheet p-0 w-[min(420px,94vw)] shadow-hard backdrop:bg-ink/50">
+      <dialog ref={ref} onCancel={() => ask && answer(false)} className="border border-line bg-sheet p-0 w-[min(420px,94vw)] shadow-dialog backdrop:bg-ink/50">
         {ask && (
           <div className="p-3">
             <p className="mb-3">{ask.message}</p>

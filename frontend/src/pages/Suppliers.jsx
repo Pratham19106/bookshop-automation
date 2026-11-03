@@ -125,7 +125,7 @@ export default function Suppliers() {
       </PageTitle>
       <div className="toolbar">
         <div className="flex-1 min-w-[200px]"><label htmlFor="q">Search name, contact or category</label><input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <label className="!normal-case !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} /> Show inactive</label>
+        <label className="!normal-case !font-normal !tracking-normal !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} /> Show inactive</label>
       </div>
       <Async state={st}>
         {(rows) => rows.length === 0 ? <Empty>No suppliers yet.</Empty> : (

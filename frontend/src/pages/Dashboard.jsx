@@ -1,13 +1,23 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { get, qs } from '../lib/api';
+import { BookCover } from '../lib/cover';
 import { bookName, daysAgo, fmt, fmtDate, today } from '../lib/format';
 import { useLoad } from '../lib/hooks';
+import { EASE, Reveal, Stagger, StaggerItem } from '../lib/motion';
 import { Async, Badge, Empty, PageTitle, Tile, tone } from '../lib/ui';
 
-function Bars({ series }) {
+// Net sales over time. The line draws itself in (slowly), then the area beneath it fades up.
+function LineChart({ series }) {
   if (!series.length) return <Empty>No sales in this period.</Empty>;
+  const W = 600; const H = 190; const PAD = { l: 8, r: 8, t: 14, b: 8 };
   const max = Math.max(...series.map((s) => s.netSalesCents), 1);
+  const x = (i) => PAD.l + (series.length === 1 ? (W - PAD.l - PAD.r) / 2 : (i * (W - PAD.l - PAD.r)) / (series.length - 1));
+  const y = (v) => PAD.t + (1 - v / max) * (H - PAD.t - PAD.b);
+  const pts = series.map((s, i) => [x(i), y(s.netSalesCents)]);
+  const line = pts.map(([px, py], i) => `${i ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
+  const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${H - PAD.b} L${pts[0][0].toFixed(1)},${H - PAD.b} Z`;
   return (
     <>
       <div className="flex items-end gap-1 h-[160px] pt-2 border-b-2 border-black" role="img" aria-label="Net sales per period">
@@ -29,7 +39,7 @@ function Bars({ series }) {
   );
 }
 
-function HBars({ rows, name, value, format = fmt }) {
+function RuledBars({ rows, name, value, format = fmt }) {
   if (!rows.length) return <Empty>Nothing in this period.</Empty>;
   const max = Math.max(...rows.map(value), 1);
   return rows.map((r, i) => (
@@ -46,6 +56,37 @@ function HBars({ rows, name, value, format = fmt }) {
       <span className="font-bold text-black">{format(value(r))}</span>
     </div>
   ));
+}
+
+// Magazine-style feature: the top seller large, the next few as a row of covers resting on a shelf line.
+function Showcase({ books }) {
+  if (!books.length) return <Empty>No sales in this period yet.</Empty>;
+  const [lead, ...rest] = books;
+  return (
+    <Stagger className="grid md:grid-cols-[minmax(0,1.05fr)_minmax(0,1.6fr)] gap-x-12 gap-y-8 items-end">
+      <StaggerItem className="flex gap-6 items-end">
+        <BookCover book={lead} w={150} />
+        <div className="pb-1 min-w-0">
+          <div className="text-[.66rem] uppercase tracking-[.2em] text-terracotta font-semibold">Best seller</div>
+          <div className="font-serif text-[1.9rem] leading-[1.05] mt-1.5">{lead.title}</div>
+          <div className="italic font-serif text-muted mt-1">{lead.author}{lead.edition ? ` · ${lead.edition}` : ''}</div>
+          <div className="mt-3 font-mono text-[.9rem]"><strong className="text-[1.4rem] font-medium">{lead.units}</strong> copies · {fmt(lead.revenueCents)}</div>
+        </div>
+      </StaggerItem>
+      <div className="relative">
+        <div className="flex gap-5 items-end pb-3 overflow-x-auto">
+          {rest.slice(0, 5).map((b, i) => (
+            <StaggerItem key={b.bookId} className="w-[92px] shrink-0">
+              <BookCover book={b} w={92} />
+              <div className="mt-2.5 text-[.8rem] leading-tight font-serif line-clamp-2" title={b.title}><span className="text-muted font-sans text-[.7rem]">{i + 2}. </span>{b.title}</div>
+              <div className="font-mono text-[.75rem] text-muted">{b.units} sold</div>
+            </StaggerItem>
+          ))}
+        </div>
+        <div className="absolute left-0 right-0 bottom-[3.9rem] h-px bg-ink/25 -z-10" aria-hidden="true" />
+      </div>
+    </Stagger>
+  );
 }
 
 export default function Dashboard() {

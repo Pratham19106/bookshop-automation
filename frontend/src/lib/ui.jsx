@@ -3,6 +3,7 @@ import { get, qs } from './api';
 import { fmt, label, STATUS_KIND } from './format';
 import { fail } from './overlays';
 import { useDebounced } from './hooks';
+import { BookCover } from './cover';
 
 // Run an async action; ignores re-entry while it runs (double-click safe) and reports errors as a toast.
 export function useAction(fn) {
