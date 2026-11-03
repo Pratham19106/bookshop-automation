@@ -21,7 +21,15 @@ export default function Expenses() {
 
   return (
     <div>
-      <PageTitle>Operating Expenses</PageTitle>
+      <PageTitle
+        actions={
+          <span className="bg-[#FEF3C7] text-[#B45309] font-mono text-xs font-bold px-2.5 py-1 border border-[#B45309] shadow-[2px_2px_0px_0px_#B45309]">
+            Overhead Accounting
+          </span>
+        }
+      >
+        Operating Expenses
+      </PageTitle>
       <p className="text-muted mb-2">Record rent, wages, utilities and similar costs. Stock purchases are recorded automatically through purchase orders and goods receipts — do not enter them here.</p>
       <form className="toolbar" onSubmit={add}>
         <div><label htmlFor="d">Date</label><input id="d" type="date" className="input" value={f.date} onChange={set('date')} required /></div>

@@ -106,7 +106,15 @@ export default function Settings() {
   const { isOwner } = useAuth();
   return (
     <div>
-      <PageTitle>Settings</PageTitle>
+      <PageTitle
+        actions={
+          <span className="bg-[#F1F5F9] text-[#475569] font-mono text-xs font-bold px-2.5 py-1 border border-[#475569] shadow-[2px_2px_0px_0px_#475569]">
+            System Config
+          </span>
+        }
+      >
+        Settings
+      </PageTitle>
       <div className="grid lg:grid-cols-2 gap-3 items-start"><PasswordCard />{isOwner && <ShopCard />}</div>
       {isOwner && <UsersCard />}
     </div>

@@ -28,7 +28,15 @@ export default function Restock() {
 
   return (
     <div>
-      <PageTitle>Restocking Recommendations</PageTitle>
+      <PageTitle
+        actions={
+          <span className="bg-[#F3E8FF] text-[#6D28D9] font-mono text-xs font-bold px-2.5 py-1 border border-[#6D28D9] shadow-[2px_2px_0px_0px_#6D28D9]">
+            05 · Velocity Engine
+          </span>
+        }
+      >
+        Restocking Recommendations
+      </PageTitle>
       <p className="text-muted mb-2">Rule-based and fully explained: each suggestion shows the sales and stock figures behind it. Nothing is ordered automatically.</p>
       <div className="toolbar">
         <div><label htmlFor="lb">Sales analysed over (days)</label><input id="lb" type="number" min="7" max="365" className="input font-mono" value={p.lookbackDays} onChange={(e) => setP({ ...p, lookbackDays: e.target.value })} /></div>

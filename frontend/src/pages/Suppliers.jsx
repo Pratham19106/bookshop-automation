@@ -109,7 +109,20 @@ export default function Suppliers() {
   const st = useLoad(() => get(`/suppliers${qs({ q: dq, inactive })}`), [dq, inactive]);
   return (
     <div>
-      <PageTitle actions={<button className="btn btn-primary" onClick={() => setAdding(true)}>+ Add supplier</button>}>Suppliers</PageTitle>
+      <PageTitle
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="bg-[#FFE4E6] text-[#BE123C] font-mono text-xs font-bold px-2.5 py-1 border border-[#BE123C] shadow-[2px_2px_0px_0px_#BE123C] hidden sm:inline-block">
+              06 · Supply Chain
+            </span>
+            <button className="btn btn-primary" onClick={() => setAdding(true)}>
+              + Add supplier
+            </button>
+          </div>
+        }
+      >
+        Suppliers
+      </PageTitle>
       <div className="toolbar">
         <div className="flex-1 min-w-[200px]"><label htmlFor="q">Search name, contact or category</label><input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <label className="!normal-case !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} /> Show inactive</label>

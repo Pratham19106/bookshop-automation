@@ -78,7 +78,15 @@ export default function Bills() {
 
   return (
     <div>
-      <PageTitle>Bills</PageTitle>
+      <PageTitle
+        actions={
+          <span className="bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold px-2.5 py-1 border border-[#15803D] shadow-[2px_2px_0px_0px_#15803D]">
+            Sales Register
+          </span>
+        }
+      >
+        Bills
+      </PageTitle>
       <div className="toolbar">
         <div className="grow flex-1 min-w-[180px]"><label htmlFor="q">Search bill no., customer, title or ISBN</label><input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <div><label htmlFor="from">From</label><input id="from" type="date" className="input" value={from} onChange={(e) => setFrom(e.target.value)} /></div>

@@ -17,7 +17,15 @@ export default function Inventory() {
 
   return (
     <div>
-      <PageTitle>Inventory</PageTitle>
+      <PageTitle
+        actions={
+          <span className="bg-[#CFFAFE] text-[#0E7490] font-mono text-xs font-bold px-2.5 py-1 border border-[#0E7490] shadow-[2px_2px_0px_0px_#0E7490]">
+            04 · Inventory Ledger
+          </span>
+        }
+      >
+        Inventory
+      </PageTitle>
       <div className="toolbar">
         <div className="flex-1 min-w-[200px]"><label htmlFor="q">Search</label><input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <label className="!normal-case !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={low} onChange={(e) => setLow(e.target.checked)} /> Low stock only</label>

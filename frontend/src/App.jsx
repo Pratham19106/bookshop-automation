@@ -36,7 +36,14 @@ const PAGES = [
   { path: '/help', group: 'Documentation', title: 'Help & Manual', el: <Help /> },
   { path: '/landing', group: 'Documentation', title: 'Platform Info', el: <Landing /> },
 ];
-const GROUPS = ['Sales', 'Stock', 'Reports', 'Admin', 'Documentation'];
+
+const GROUPS = [
+  { name: 'Sales', tag: 'bg-[#DCFCE7] text-[#15803D]' },
+  { name: 'Stock', tag: 'bg-[#EEF2FF] text-[#4F46E5]' },
+  { name: 'Reports', tag: 'bg-[#DBEAFE] text-[#1D4ED8]' },
+  { name: 'Admin', tag: 'bg-[#F1F5F9] text-[#475569]' },
+  { name: 'Documentation', tag: 'bg-[#FEFCE8] text-[#854D0E]' },
+];
 
 function getSectionId(pathname) {
   const seg = pathname.replace(/^\//, '').split('/')[0];
@@ -59,27 +66,44 @@ function Shell({ pages }) {
   }, [current, settings.shopName]);
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[200px_1fr] md:grid-rows-[auto_1fr] print:block">
-      <aside className="bg-sheet border-r border-ink md:row-span-2 md:sticky md:top-0 md:h-screen overflow-y-auto flex flex-col print:hidden">
-        <NavLink to="/" className="block px-3 py-3 border-b border-ink font-serif font-bold text-[1.05rem] text-ink no-underline">
-          {settings.shopName}
+    <div className="min-h-screen md:grid md:grid-cols-[220px_1fr] md:grid-rows-[auto_1fr] print:block bg-[#FAF9F5]">
+      <aside className="bg-white border-r-2 border-black md:row-span-2 md:sticky md:top-0 md:h-screen overflow-y-auto flex flex-col print:hidden shadow-sm">
+        <NavLink
+          to="/"
+          className="block px-3.5 py-3 border-b-2 border-black bg-white no-underline hover:bg-[#FAF9F5] transition-colors"
+        >
+          <div className="flex items-center gap-2 mb-1">
+            <span className="bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold px-1.5 py-0.5 text-[10px] border border-black shadow-[1.5px_1.5px_0px_0px_#1A1A1A]">
+              BK-OS
+            </span>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#4F46E5]">
+              Automated
+            </span>
+          </div>
+          <div className="font-serif font-black text-[1.12rem] text-black leading-tight truncate">
+            {settings.shopName}
+          </div>
         </NavLink>
-        <nav aria-label="Main" className="flex md:flex-col flex-wrap md:flex-nowrap">
-          {GROUPS.map((g) => {
+
+        <nav aria-label="Main" className="flex md:flex-col flex-wrap md:flex-nowrap p-1.5 gap-0.5">
+          {GROUPS.map(({ name: g, tag }) => {
             const items = pages.filter((p) => p.group === g);
             if (!items.length) return null;
             return (
-              <div key={g} className="contents md:block md:border-t md:border-hair first:md:border-t-0">
-                <div className="hidden md:block text-[.7rem] tracking-[.1em] uppercase text-muted px-3 pt-2.5 pb-0.5">
-                  {g}
+              <div key={g} className="contents md:block mb-2">
+                <div className="hidden md:flex items-center justify-between text-[.68rem] tracking-[.1em] uppercase font-mono font-bold px-2.5 pt-2 pb-1 text-[#4B5563]">
+                  <span>{g}</span>
+                  <span className={`w-1.5 h-1.5 rounded-full ${tag.split(' ')[0]}`}></span>
                 </div>
                 {items.map((p) => (
                   <NavLink
                     key={p.path}
                     to={p.path}
                     className={({ isActive }) =>
-                      `block px-3 py-1 text-ink no-underline border-l-[3px] hover:bg-ink hover:text-paper ${
-                        isActive ? 'bg-tint border-ink font-bold' : 'border-transparent'
+                      `block px-2.5 py-1.5 text-xs no-underline transition-all my-0.5 ${
+                        isActive
+                          ? 'bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold border-l-4 border-[#CCFF00] shadow-[2px_2px_0px_0px_#1A1A1A]'
+                          : 'text-black border-l-[3px] border-transparent hover:bg-[#1A1A1A] hover:text-[#CCFF00] font-sans font-medium'
                       }`
                     }
                   >
@@ -92,36 +116,53 @@ function Shell({ pages }) {
         </nav>
       </aside>
 
-      <header className="flex items-center justify-between gap-3 px-3.5 py-1.5 bg-sheet border-b border-ink md:sticky md:top-0 z-20 print:hidden">
-        <div className="flex items-center gap-2.5">
-          <span className="font-serif font-bold text-base">{current?.title}</span>
+      <header className="flex items-center justify-between gap-3 px-4 py-2.5 bg-white/95 backdrop-blur-md border-b-2 border-black sticky top-0 z-20 print:hidden shadow-sm">
+        <div className="flex items-center gap-3">
+          <span className="font-serif font-black text-lg text-black tracking-tight">{current?.title}</span>
           {sectionId && (
             <Link
               to={`/help?section=${sectionId}`}
-              className="btn btn-sm text-[.78rem] bg-paper hover:bg-navy hover:text-white border-hair flex items-center gap-1 font-sans font-medium"
+              className="px-2.5 py-1 bg-[#EEF2FF] text-[#4F46E5] border border-[#4F46E5] font-mono font-bold text-xs hover:bg-[#4F46E5] hover:text-white transition-all shadow-[2px_2px_0px_0px_#4F46E5] flex items-center gap-1"
               title={`View ${current?.title} documentation in Help Manual`}
             >
-              <span className="font-bold text-navy">?</span> Help for this page
+              <span className="font-bold">?</span> Help for this page
             </Link>
           )}
         </div>
         <div className="flex items-center gap-3">
           <Link
             to="/help"
-            className="text-[.8rem] text-navy hover:underline hidden sm:inline-block"
+            className="text-xs font-mono font-bold text-[#4F46E5] hover:underline hidden sm:inline-block"
           >
-            Help Manual
+            📖 Manual
           </Link>
-          <span className="text-muted text-[.82rem] whitespace-nowrap">
-            {user.fullName} ({user.role}) ·{' '}
-            <button className="btn btn-link" onClick={signOut}>
+          <Link
+            to="/landing"
+            className="text-xs font-mono font-bold text-black hover:bg-[#CCFF00] px-2 py-0.5 border border-black shadow-[1px_1px_0px_0px_#1A1A1A] hidden md:inline-block"
+          >
+            Platform Info
+          </Link>
+          <div className="flex items-center gap-2">
+            <span className="text-[#4B5563] text-xs font-medium whitespace-nowrap">
+              <strong className="text-black font-semibold">{user.fullName}</strong>
+              <span className={`inline-block px-1.5 py-0.2 ml-1 text-[10px] font-mono font-bold uppercase border ${
+                user.role === 'owner' ? 'bg-[#1A1A1A] text-[#CCFF00] border-black' : 'bg-[#FEF3C7] text-[#B45309] border-[#B45309]'
+              }`}>
+                {user.role}
+              </span>
+            </span>
+            <button
+              className="btn btn-sm border-2 border-black bg-white hover:bg-[#BE123C] hover:text-white hover:border-[#BE123C] ml-1"
+              onClick={signOut}
+              title="Sign out of Bookshop Terminal"
+            >
               Sign out
             </button>
-          </span>
+          </div>
         </div>
       </header>
 
-      <main className="p-3.5 min-w-0 max-w-[1400px] w-full outline-none print:p-0">
+      <main className="p-4 md:p-5 min-w-0 max-w-[1440px] w-full outline-none print:p-0">
         <Routes>
           {pages.map((p) => (
             <Route key={p.path} path={p.path} element={p.el} />
@@ -138,7 +179,7 @@ export default function App() {
   const { user, ready, isOwner } = useAuth();
   const { pathname } = useLocation();
 
-  if (!ready) return <div className="p-10 text-center text-muted">Loading…</div>;
+  if (!ready) return <div className="p-10 text-center text-muted font-mono">Loading…</div>;
 
   if (!user) {
     if (pathname === '/help') {

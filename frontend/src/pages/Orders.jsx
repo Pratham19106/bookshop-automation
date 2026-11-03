@@ -208,7 +208,20 @@ export default function Orders() {
 
   return (
     <div>
-      <PageTitle actions={<button id="new" className="btn btn-primary" onClick={() => setAdding(true)}>+ New order</button>}>Phone Orders</PageTitle>
+      <PageTitle
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="bg-[#FEF3C7] text-[#B45309] font-mono text-xs font-bold px-2.5 py-1 border border-[#B45309] shadow-[2px_2px_0px_0px_#B45309] hidden sm:inline-block">
+              03 · Reservations
+            </span>
+            <button id="new" className="btn btn-primary" onClick={() => setAdding(true)}>
+              + New order
+            </button>
+          </div>
+        }
+      >
+        Phone Orders
+      </PageTitle>
       <Tabs tabs={tabs} value={status} onChange={setStatus} />
       <div className="toolbar">
         <div className="flex-1 min-w-[200px]"><label htmlFor="q">Search order no., name or phone</label><input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} /></div>

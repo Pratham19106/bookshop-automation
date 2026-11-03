@@ -163,7 +163,20 @@ export default function Catalogue() {
 
   return (
     <div>
-      <PageTitle actions={<button id="add" className="btn btn-primary" onClick={() => setAdding(true)}>+ Add book</button>}>Catalogue</PageTitle>
+      <PageTitle
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="bg-[#EEF2FF] text-[#4F46E5] font-mono text-xs font-bold px-2.5 py-1 border border-[#4F46E5] shadow-[2px_2px_0px_0px_#4F46E5] hidden sm:inline-block">
+              02 · Catalogue
+            </span>
+            <button id="add" className="btn btn-primary" onClick={() => setAdding(true)}>
+              + Add book
+            </button>
+          </div>
+        }
+      >
+        Catalogue
+      </PageTitle>
       <div className="toolbar">
         <div className="flex-1 min-w-[200px]"><label htmlFor="q">Search title, author, ISBN, publisher</label><input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} autoFocus /></div>
         <div><label htmlFor="genre">Genre</label>

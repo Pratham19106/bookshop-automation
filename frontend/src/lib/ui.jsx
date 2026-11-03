@@ -33,18 +33,28 @@ export function Modal({ title, wide = false, onClose, children }) {
   const ref = useRef(null);
   useEffect(() => { ref.current?.showModal(); }, []);
   return (
-    <dialog ref={ref} onClose={onClose} onClick={(e) => { if (e.target === ref.current) ref.current.close(); }}
-      className={`border border-ink bg-sheet text-ink p-0 shadow-hard backdrop:bg-ink/55 ${wide ? 'w-[min(980px,96vw)]' : 'w-[min(560px,94vw)]'}`}>
-      <div className="flex justify-between items-center px-3 py-1.5 border-b border-ink bg-tint sticky top-0 z-10">
-        <h2 className="!mb-0">{title}</h2>
-        <button className="px-2 text-lg leading-none hover:bg-ink hover:text-paper" aria-label="Close" onClick={() => ref.current.close()}>✕</button>
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      onClick={(e) => { if (e.target === ref.current) ref.current.close(); }}
+      className={`border-2 border-black bg-white text-black p-0 shadow-hard-lg backdrop:bg-black/60 ${wide ? 'w-[min(980px,96vw)]' : 'w-[min(580px,94vw)]'} animate-stamp`}
+    >
+      <div className="flex justify-between items-center px-4 py-2.5 border-b-2 border-black bg-[#1A1A1A] text-white sticky top-0 z-10">
+        <h2 className="!mb-0 font-serif font-black text-lg text-[#FAF9F5] tracking-tight">{title}</h2>
+        <button
+          className="w-7 h-7 flex items-center justify-center font-mono font-bold text-xs bg-[#CCFF00] text-black border border-black hover:bg-white hover:text-black transition-colors"
+          aria-label="Close"
+          onClick={() => ref.current.close()}
+        >
+          ✕
+        </button>
       </div>
-      <div className="p-3 max-h-[80vh] overflow-y-auto">{children}</div>
+      <div className="p-4 max-h-[82vh] overflow-y-auto bg-white">{children}</div>
     </dialog>
   );
 }
 
-export const Actions = ({ children }) => <div className="flex flex-wrap gap-1.5 justify-end mt-3">{children}</div>;
+export const Actions = ({ children }) => <div className="flex flex-wrap gap-2 justify-end mt-4 pt-2 border-t border-[#E5E7EB]">{children}</div>;
 
 export function Badge({ status, kind, children }) {
   const k = kind ?? STATUS_KIND[status] ?? '';
@@ -54,7 +64,7 @@ export function Badge({ status, kind, children }) {
 export const Tile = ({ k, v, s, tone = '' }) => (
   <div className="tile">
     <div className="tile-k">{k}</div>
-    <div className={`tile-v ${tone === 'pos' ? 'text-olive' : tone === 'neg' ? 'text-brick' : ''}`}>{v}</div>
+    <div className={`tile-v ${tone === 'pos' ? 'text-[#15803D]' : tone === 'neg' ? 'text-[#BE123C]' : ''}`}>{v}</div>
     {s ? <div className="tile-s">{s}</div> : null}
   </div>
 );
@@ -64,21 +74,38 @@ export const Empty = ({ children }) => <div className="empty">{children}</div>;
 
 // Renders loading / error / content for the result of useLoad().
 export function Async({ state, children }) {
-  if (state.loading && !state.data) return <div className="p-6 text-center text-muted">Loading…</div>;
+  if (state.loading && !state.data) {
+    return (
+      <div className="p-8 text-center text-muted font-mono flex items-center justify-center gap-2">
+        <span className="w-2.5 h-2.5 bg-[#4F46E5] animate-ping inline-block"></span>
+        Loading data…
+      </div>
+    );
+  }
   if (state.error) return <div className="error-box">{state.error.message}</div>;
   return state.data ? children(state.data) : null;
 }
 
 export const PageTitle = ({ children, actions }) => (
-  <div className="flex flex-wrap justify-between items-end gap-2 mb-2.5 border-b-2 border-ink">
-    <h1 className="!border-0 !mb-0 pb-1.5">{children}</h1>
-    <div className="pb-1.5 flex gap-1.5">{actions}</div>
+  <div className="flex flex-wrap justify-between items-end gap-2.5 mb-3.5 pb-2.5 border-b-2 border-black">
+    <div className="flex items-center gap-2">
+      <h1 className="!border-0 !mb-0 pb-0">{children}</h1>
+    </div>
+    <div className="flex items-center gap-2">{actions}</div>
   </div>
 );
 
 export const Tabs = ({ tabs, value, onChange }) => (
-  <div className="flex flex-wrap mb-2.5">
-    {tabs.map(([v, l]) => <button key={v} className={`btn tab ${value === v ? 'tab-active' : ''}`} onClick={() => onChange(v)}>{l}</button>)}
+  <div className="flex flex-wrap mb-3 gap-1">
+    {tabs.map(([v, l]) => (
+      <button
+        key={v}
+        className={`tab ${value === v ? 'tab-active' : ''}`}
+        onClick={() => onChange(v)}
+      >
+        {l}
+      </button>
+    ))}
   </div>
 );
 
@@ -109,21 +136,44 @@ export function BookPicker({ onPick, placeholder = 'Search title, author or ISBN
 
   return (
     <div>
-      <input type="search" className="input picker-q" value={q} onChange={(e) => setQ(e.target.value)} onKeyDown={onKey}
-        placeholder={placeholder} autoComplete="off" autoFocus={autoFocus} aria-label="Search books" />
+      <input
+        type="search"
+        className="input picker-q"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={onKey}
+        placeholder={placeholder}
+        autoComplete="off"
+        autoFocus={autoFocus}
+        aria-label="Search books"
+      />
       {dq ? (
-        <div className="mt-1.5 max-h-[56vh] overflow-y-auto border border-ink border-b-0">
-          {items.length === 0 && <div className="p-3 text-center text-muted border-b border-ink">No books match “{dq}”.</div>}
+        <div className="mt-2 max-h-[56vh] overflow-y-auto border-2 border-black bg-white shadow-hard">
+          {items.length === 0 && <div className="p-4 text-center text-muted font-serif">No books match “{dq}”.</div>}
           {items.map((b) => (
-            <button type="button" key={b.id} onClick={() => pick(b)}
-              className={`result group w-full grid grid-cols-[1fr_auto] gap-x-3 text-left px-2 py-1 border-0 border-b border-ink bg-sheet hover:bg-ink hover:text-paper ${showStock && b.availableQty <= 0 ? 'opacity-60' : ''}`}>
-              <span className="font-serif font-bold">{b.title}{b.edition && <em className="font-normal"> ({b.edition})</em>}</span>
-              <span className="row-span-2 text-right font-mono text-[.82rem] flex flex-col">
-                <strong>{fmt(b.priceCents)}</strong>
-                {showStock && <span className={b.availableQty <= 0 ? 'text-brick group-hover:text-paper' : b.isLowStock ? 'text-ochre group-hover:text-paper' : ''}>{b.availableQty} in stock{b.reservedQty ? ` (${b.reservedQty} reserved)` : ''}</span>}
-                <span className="text-muted group-hover:text-paper font-sans">{b.location || 'No location set'}</span>
+            <button
+              type="button"
+              key={b.id}
+              onClick={() => pick(b)}
+              className={`result group w-full grid grid-cols-[1fr_auto] gap-x-3 text-left px-3 py-2 border-0 border-b border-[#E2E8F0] last:border-b-0 bg-white hover:bg-[#1A1A1A] hover:text-[#CCFF00] transition-colors ${
+                showStock && b.availableQty <= 0 ? 'opacity-60' : ''
+              }`}
+            >
+              <span className="font-serif font-bold text-sm text-black group-hover:text-[#CCFF00]">
+                {b.title}{b.edition && <em className="font-normal opacity-80"> ({b.edition})</em>}
               </span>
-              <span className="text-muted group-hover:text-paper text-[.82rem]">{b.author}{b.publisher ? ` · ${b.publisher}` : ''}{b.isbn ? <> · ISBN <span className="font-mono">{b.isbn}</span></> : ''}</span>
+              <span className="row-span-2 text-right font-mono text-[.82rem] flex flex-col">
+                <strong className="text-black group-hover:text-[#CCFF00]">{fmt(b.priceCents)}</strong>
+                {showStock && (
+                  <span className={b.availableQty <= 0 ? 'text-[#BE123C] group-hover:text-[#CCFF00] font-bold' : b.isLowStock ? 'text-[#B45309] group-hover:text-[#CCFF00] font-bold' : 'text-[#15803D] group-hover:text-[#CCFF00]'}>
+                    {b.availableQty} in stock{b.reservedQty ? ` (${b.reservedQty} reserved)` : ''}
+                  </span>
+                )}
+                <span className="text-muted group-hover:text-[#FAF9F5] font-sans text-xs">{b.location || 'No location set'}</span>
+              </span>
+              <span className="text-muted group-hover:text-[#FAF9F5] text-xs">
+                {b.author}{b.publisher ? ` · ${b.publisher}` : ''}{b.isbn ? <> · ISBN <span className="font-mono">{b.isbn}</span></> : ''}
+              </span>
             </button>
           ))}
         </div>

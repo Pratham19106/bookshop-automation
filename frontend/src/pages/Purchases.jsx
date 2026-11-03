@@ -138,7 +138,20 @@ export default function Purchases() {
 
   return (
     <div>
-      <PageTitle actions={<button id="new-po" className="btn btn-primary" onClick={() => setForm({})}>+ New purchase order</button>}>Purchase Orders</PageTitle>
+      <PageTitle
+        actions={
+          <div className="flex items-center gap-2">
+            <span className="bg-[#FFE4E6] text-[#BE123C] font-mono text-xs font-bold px-2.5 py-1 border border-[#BE123C] shadow-[2px_2px_0px_0px_#BE123C] hidden sm:inline-block">
+              06 · Restocking POs
+            </span>
+            <button id="new-po" className="btn btn-primary" onClick={() => setForm({})}>
+              + New purchase order
+            </button>
+          </div>
+        }
+      >
+        Purchase Orders
+      </PageTitle>
       <Tabs tabs={[['', 'All'], ['open', 'Open'], ['received', 'Received'], ['cancelled', 'Cancelled']]} value={status} onChange={setStatus} />
       <Async state={st}>
         {(rows) => rows.length === 0 ? <Empty>No purchase orders.</Empty> : (

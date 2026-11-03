@@ -219,10 +219,15 @@ export default function Billing() {
       <PageTitle
         actions={
           <div className="flex items-center gap-2">
+            <span className="bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold px-2.5 py-1 border border-[#15803D] shadow-[2px_2px_0px_0px_#15803D] hidden sm:inline-block">
+              01 · POS Counter
+            </span>
             {drafts.length > 0 && (
               <button
                 type="button"
-                className={`btn btn-sm flex items-center gap-1.5 font-bold ${showDraftsList ? 'bg-ink text-paper' : 'border-ochre text-ochre bg-amber-50'}`}
+                className={`btn btn-sm flex items-center gap-1.5 font-bold ${
+                  showDraftsList ? 'bg-[#1A1A1A] text-[#CCFF00]' : 'border-black text-black bg-[#FEF3C7]'
+                }`}
                 onClick={() => setShowDraftsList(!showDraftsList)}
               >
                 <span>📁 Parked Drafts ({drafts.length})</span>
@@ -232,11 +237,11 @@ export default function Billing() {
             {cart.length > 0 && (
               <button
                 type="button"
-                className="btn btn-sm hover:border-navy hover:text-navy"
+                className="btn btn-sm border-black hover:bg-[#CCFF00] hover:text-black"
                 onClick={saveAsDraft}
                 title="Save this bill as draft and clear the counter for another customer"
               >
-                Save as Draft
+                Hold / Save Draft
               </button>
             )}
           </div>
@@ -247,31 +252,31 @@ export default function Billing() {
 
       {/* Parked Drafts Drawer / Banner */}
       {drafts.length > 0 && showDraftsList && (
-        <section className="card bg-amber-50 border-2 border-ochre mb-3 p-3 animate-slide-up">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-ochre">
+        <section className="bg-[#FEFCE8] border-2 border-black mb-4 p-3.5 shadow-[4px_4px_0px_0px_#B45309] animate-slide-up">
+          <div className="flex items-center justify-between pb-2 mb-2.5 border-b-2 border-black">
             <div className="flex items-center gap-2">
               <span className="badge badge-warn font-bold">Multi-Customer Queue</span>
-              <strong className="text-sm font-serif">Parked Bill Drafts ({drafts.length})</strong>
+              <strong className="text-sm font-serif font-black text-black">Parked Bill Drafts ({drafts.length})</strong>
             </div>
-            <span className="text-[.75rem] text-muted font-sans">
+            <span className="text-[.75rem] text-[#4B5563] font-mono">
               Click "Resume" to load a draft back into the counter register.
             </span>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
             {drafts.map((d) => (
               <div
                 key={d.id}
-                className="bg-sheet border border-ink p-2.5 flex flex-col justify-between hover:border-navy transition-colors shadow-sm"
+                className="bg-white border-2 border-black p-3 flex flex-col justify-between hover:shadow-[3px_3px_0px_0px_#1A1A1A] transition-all shadow-[2px_2px_0px_0px_#1A1A1A]"
               >
                 <div>
                   <div className="flex items-start justify-between gap-1 mb-1">
-                    <strong className="text-[.9rem] text-ink font-serif truncate">
+                    <strong className="text-[.9rem] text-black font-serif truncate">
                       {d.name}
                     </strong>
                     <button
                       type="button"
-                      className="text-brick text-xs hover:font-bold px-1"
+                      className="text-[#BE123C] text-xs font-bold hover:bg-[#FFE4E6] px-1.5 py-0.5 border border-transparent hover:border-[#BE123C]"
                       title="Discard draft"
                       onClick={(e) => discardDraft(d.id, e)}
                     >
@@ -280,7 +285,7 @@ export default function Billing() {
                   </div>
                   <div className="text-[.78rem] text-muted font-mono mb-2">
                     {d.itemCount} {d.itemCount === 1 ? 'item' : 'items'} ·{' '}
-                    <strong className="text-ink">{fmt(d.totalCents)}</strong> ·{' '}
+                    <strong className="text-black font-bold">{fmt(d.totalCents)}</strong> ·{' '}
                     {new Date(d.savedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </div>
                   <div className="text-[.75rem] text-muted line-clamp-1 italic">
@@ -288,7 +293,7 @@ export default function Billing() {
                   </div>
                 </div>
 
-                <div className="mt-2.5 pt-2 border-t border-hair flex items-center justify-between">
+                <div className="mt-2.5 pt-2 border-t border-[#E5E7EB] flex items-center justify-between">
                   <span className="badge text-[.68rem] uppercase">{d.method}</span>
                   <button
                     type="button"
@@ -304,26 +309,26 @@ export default function Billing() {
         </section>
       )}
 
-      <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr] items-start">
+      <div className="grid gap-4 lg:grid-cols-[1.1fr_1fr] items-start">
         {/* Book Finder Column */}
         <section className="card">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-black">
             <h2 className="!mb-0">Find a book</h2>
-            <span className="text-muted text-[.75rem] font-mono">Barcode / ISBN Search</span>
+            <span className="badge badge-info">Barcode / ISBN Search</span>
           </div>
           <BookPicker onPick={add} autoFocus />
-          <p className="text-muted text-[.85rem] mt-2">
+          <p className="text-muted text-xs font-mono mt-2.5">
             Tip: scan or type a full ISBN and press Enter to add it straight away.
           </p>
         </section>
 
         {/* Current Bill Column */}
         <section className="card relative">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-ink">
+          <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-black">
             <div className="flex items-center gap-2">
               <h2 className="!mb-0">Current bill</h2>
               {cart.length > 0 && (
-                <span className="badge badge-ok text-[.68rem] tracking-wider" title="Active cart is saved locally in real-time">
+                <span className="bg-[#CCFF00] text-black font-mono font-bold text-[.68rem] px-2 py-0.5 border border-black shadow-[1px_1px_0px_0px_#1A1A1A] tracking-wider" title="Active cart is saved locally in real-time">
                   ● Auto-Saved
                 </span>
               )}
@@ -331,7 +336,7 @@ export default function Billing() {
             {drafts.length > 0 && !showDraftsList && (
               <button
                 type="button"
-                className="btn btn-sm border-ochre text-ochre text-xs font-bold"
+                className="btn btn-sm bg-[#FEF3C7] text-black border-black text-xs font-bold"
                 onClick={() => setShowDraftsList(true)}
               >
                 📁 {drafts.length} Parked {drafts.length === 1 ? 'Draft' : 'Drafts'}
@@ -361,8 +366,10 @@ export default function Billing() {
             <div>
               <div className="empty">The bill is empty. Search for a book and click it to add.</div>
               {drafts.length > 0 && (
-                <div className="mt-3 p-2.5 bg-amber-50 border border-ochre text-center">
-                  <span className="text-sm font-serif mr-2">You have {drafts.length} parked customer bill drafts.</span>
+                <div className="mt-4 p-3 bg-[#FEFCE8] border-2 border-black text-center shadow-[3px_3px_0px_0px_#B45309]">
+                  <span className="text-sm font-serif font-bold mr-2 text-black">
+                    You have {drafts.length} parked customer bill drafts.
+                  </span>
                   <button
                     type="button"
                     className="btn btn-sm btn-primary"

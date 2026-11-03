@@ -91,7 +91,10 @@ export default function Shelves() {
     <div>
       <PageTitle
         actions={
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
+            <span className="bg-[#EEF2FF] text-[#4F46E5] font-mono text-xs font-bold px-2.5 py-1 border border-[#4F46E5] shadow-[2px_2px_0px_0px_#4F46E5] hidden sm:inline-block">
+              Physical Coordinates
+            </span>
             <button className="btn btn-sm" onClick={() => setShowWizard(true)}>
               🪄 Layout Wizard
             </button>
