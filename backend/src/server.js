@@ -11,7 +11,8 @@ if (users === 0) {
   console.warn('No users exist yet. Create the owner account with:\n  npm run create-owner -- <username> <password>\n(or load demo data with: npm run seed)');
 }
 
-const server = createApp(db).listen(config.port, () => {
+const app = createApp(db);
+const server = app.listen(config.port, () => {
   console.log(`Bookshop Automation System running at http://localhost:${config.port}`);
 });
 
@@ -20,3 +21,5 @@ function shutdown() {
 }
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);
+
+module.exports = app;

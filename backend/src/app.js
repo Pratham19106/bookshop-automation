@@ -170,6 +170,7 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
 
   api.use((req, res, next) => next(new AppError(404, 'not_found', 'Unknown API endpoint')));
   app.use('/api', api);
+  app.use(api);
 
   // eslint-disable-next-line no-unused-vars
   app.use((err, req, res, next) => {
