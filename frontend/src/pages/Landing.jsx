@@ -1,32 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
-import { useAction, Field } from '../lib/ui';
 
 export default function Landing() {
-  const { user, login } = useAuth();
-  const navigate = useNavigate();
-
-  // Sign-in state for the embedded quick sign-in card
-  const [u, setU] = useState('');
-  const [p, setP] = useState('');
-  const [err, setErr] = useState('');
+  const { user } = useAuth();
   const [activeCategory, setActiveCategory] = useState('all');
-
-  const [submit, busy] = useAction(async (e) => {
-    e?.preventDefault?.();
-    setErr('');
-    try {
-      await login(u, p);
-    } catch (e) {
-      setErr(e.message);
-    }
-  });
-
-  const fillDemo = (username, password) => {
-    setU(username);
-    setP(password);
-  };
 
   const scrollTo = (id) => {
     const el = document.getElementById(id);
@@ -81,7 +59,7 @@ export default function Landing() {
       badgeColor: 'bg-cyan-600 text-white',
       shadowColor: 'neo-shadow-cyan',
       tag: 'Append-Only Ledger',
-      summary: 'SQLite CHECK constraints enforce stock >= 0. Every single sale, delivery, and audit correction is permanently logged.',
+      summary: 'Database CHECK constraints enforce stock >= 0. Every single sale, delivery, and audit correction is permanently logged.',
       path: '/help?section=inventory'
     },
     {
@@ -129,59 +107,60 @@ export default function Landing() {
   return (
     <div className="min-h-screen bg-[#FAF9F5] text-ink font-sans selection:bg-[#CCFF00] selection:text-black overflow-x-hidden">
       
-
-
       {/* Main Navbar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b-2 border-black shadow-sm">
         <div className="max-w-[1340px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <span className="bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold px-2 py-0.5 text-xs border border-black shadow-[2px_2px_0px_0px_#1A1A1A]">
-              BK-OS
+          <Link to="/" className="flex items-center gap-2.5 no-underline">
+            <span className="w-8 h-8 bg-[#1A1A1A] text-[#CCFF00] font-serif font-black text-lg border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#1A1A1A]">
+              B
             </span>
-            <span className="font-serif font-black text-xl text-ink tracking-tight flex items-center gap-1.5">
+            <span className="font-serif font-black text-xl text-ink tracking-tight">
               Bookshop Automation System
             </span>
-          </div>
+          </Link>
 
           {/* Navigation Shortcuts */}
-          <div className="flex items-center flex-wrap gap-1 text-[.82rem] font-bold">
+          <div className="flex items-center flex-wrap gap-2 text-[.82rem] font-bold">
             <button onClick={() => scrollTo('overview')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">Overview</button>
             <button onClick={() => scrollTo('features')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">7 Modules</button>
-            <button onClick={() => scrollTo('interactive')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">Terminal</button>
             <button onClick={() => scrollTo('workflows')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">Workflows</button>
             <button onClick={() => scrollTo('roles')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">Permissions</button>
-            <Link to="/help" className="px-3 py-1 bg-[#EEF2FF] text-[#4F46E5] border border-[#4F46E5] font-bold hover:bg-[#4F46E5] hover:text-white transition-all ml-1">
+            <Link to="/help" className="px-3 py-1 bg-[#EEF2FF] text-[#4F46E5] border border-[#4F46E5] font-bold hover:bg-[#4F46E5] hover:text-white transition-all">
               📖 Help Manual →
             </Link>
-            <Link to="/register" className="px-3 py-1 bg-[#FAF5FF] text-[#6B21A8] border-2 border-[#9333EA] font-mono font-bold hover:bg-[#9333EA] hover:text-white transition-all ml-1 shadow-[2px_2px_0px_0px_#9333EA]">
-              🏢 Register Chain →
-            </Link>
             {user ? (
-              <Link to="/dashboard" className="px-3 py-1 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black font-mono font-bold hover:bg-[#CCFF00] hover:text-black transition-all ml-2 shadow-[2px_2px_0px_0px_#1A1A1A]">
-                Launch App ({user.username}) →
+              <Link to="/dashboard" className="px-3.5 py-1 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black font-mono font-bold hover:bg-[#CCFF00] hover:text-black transition-all ml-1 shadow-[2px_2px_0px_0px_#1A1A1A]">
+                Launch Terminal ({user.username}) →
               </Link>
             ) : (
-              <button onClick={() => scrollTo('signin')} className="px-3 py-1 bg-[#CCFF00] text-black border-2 border-black font-mono font-bold hover:bg-black hover:text-[#CCFF00] transition-all ml-2 shadow-[2px_2px_0px_0px_#1A1A1A]">
-                Sign In ↓
-              </button>
+              <div className="flex items-center gap-1.5 ml-1">
+                <Link
+                  to="/login"
+                  className="px-3 py-1 bg-white hover:bg-black hover:text-white text-black border-2 border-black font-mono font-bold transition-all shadow-[2px_2px_0px_0px_#1A1A1A]"
+                >
+                  Log In
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-3.5 py-1 bg-[#CCFF00] hover:bg-black hover:text-[#CCFF00] text-black border-2 border-black font-mono font-bold transition-all shadow-[2px_2px_0px_0px_#1A1A1A]"
+                >
+                  Sign Up →
+                </Link>
+              </div>
             )}
           </div>
         </div>
       </header>
 
-      {/* Hero Section: Electric High-Contrast Split Grid */}
+      {/* Hero Section */}
       <section className="relative border-b-2 border-black bg-gradient-to-br from-[#FEFCE8] via-[#FAF9F5] to-[#EFF6FF] py-12 md:py-16 px-4">
-        <div className="max-w-[1340px] mx-auto grid lg:grid-cols-[1.25fr_0.75fr] gap-10 items-center">
+        <div className="max-w-[1340px] mx-auto grid lg:grid-cols-[1.2fr_0.8fr] gap-10 items-center">
           
-          {/* Left Hero: Punchy Typography & Verified Guarantees */}
+          {/* Left Hero */}
           <div className="animate-slide-up">
-            <div className="flex flex-wrap items-center gap-2 mb-4">
-              <span className="bg-[#CCFF00] text-black font-mono text-xs font-black uppercase px-2.5 py-1 border-2 border-black shadow-[3px_3px_0px_0px_#1A1A1A] rotate-[-1deg]">
-                ⚡ High-Precision Retail OS
-              </span>
-
-              <span className="bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold uppercase px-2.5 py-1 border border-[#15803D] flex items-center gap-1">
-                <span className="w-2 h-2 rounded-full bg-[#16A34A] animate-ping"></span> Live & Verified
+            <div className="mb-4">
+              <span className="bg-[#EEF2FF] text-[#4F46E5] font-mono text-xs font-bold uppercase px-3 py-1 border border-[#4F46E5]">
+                Retail POS & Multi-Store Chain Management
               </span>
             </div>
 
@@ -190,139 +169,114 @@ export default function Landing() {
             </h1>
 
             <p className="text-lg md:text-xl text-[#4B5563] leading-relaxed mb-6 max-w-2xl font-normal">
-              Purpose-engineered for physical independent bookshops. 
+              Purpose-engineered for physical independent bookshops and multi-outlet chains. 
               Eliminate phantom inventory, prevent accidental double-selling of phone orders, 
               compare competing supplier quotes instantly, and ring up atomic counter sales with 
               <strong className="text-black font-semibold"> zero negative stock</strong>.
             </p>
 
-            {/* Vibrant Feature Pills Grid */}
-
-
             {/* CTA Buttons */}
             <div className="flex flex-wrap items-center gap-3">
-              <Link to="/register" className="px-5 py-3 bg-[#9333EA] text-white font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:bg-[#7E22CE] hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
-                🏢 REGISTER NEW BOOKSHOP CHAIN →
+              <Link
+                to="/register"
+                className="px-6 py-3.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+              >
+                Sign Up / Register Business →
               </Link>
-              <button onClick={() => scrollTo('features')} className="px-5 py-3 bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_#4F46E5] transition-all">
-                EXPLORE ALL 7 MODULES ↓
+              <Link
+                to="/login"
+                className="px-6 py-3.5 bg-white hover:bg-black hover:text-[#CCFF00] text-black font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+              >
+                Log In to Terminal →
+              </Link>
+              <button
+                onClick={() => scrollTo('features')}
+                className="px-4 py-3.5 bg-[#FAF9F5] text-black hover:bg-black hover:text-white font-mono font-bold text-sm border-2 border-black transition-all"
+              >
+                Explore 7 Modules ↓
               </button>
-              <Link to="/help" className="px-5 py-3 bg-white text-black font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:bg-[#FAF5FF] hover:text-[#7C3AED] transition-all">
-                READ COMPLETE MANUAL →
-              </Link>
             </div>
           </div>
 
-          {/* Right Hero: Modern Neo-Brutalist Sign-in Register */}
-          <div id="signin" className="animate-stamp">
-            <div className="bg-white border-2 border-black p-6 shadow-[8px_8px_0px_0px_#1A1A1A] relative">
-              
-              {/* Badge Decorator */}
-              <div className="absolute -top-3.5 -right-3.5 bg-[#CCFF00] text-black font-mono font-black text-[.7rem] px-2.5 py-1 border-2 border-black shadow-[2px_2px_0px_0px_#1A1A1A] uppercase rotate-2">
-                Till Ready ⚡
-              </div>
-
-              <div className="flex items-center justify-between pb-3 mb-4 border-b-2 border-black">
-                <div>
-                  <div className="text-[.7rem] uppercase tracking-wider font-mono font-bold text-[#4F46E5]">
-                    Point-of-Sale Access
-                  </div>
-                  <h2 className="!mb-0 text-2xl font-serif font-black text-black">Sign in to Terminal</h2>
+          {/* Right Hero: Direct Sign-in or Register Portal Card */}
+          <div className="animate-stamp">
+            <div className="bg-white border-2 border-black p-6 sm:p-8 shadow-[8px_8px_0px_0px_#1A1A1A]">
+              <div className="pb-4 mb-5 border-b-2 border-black">
+                <div className="text-[.72rem] uppercase tracking-wider font-mono font-bold text-[#4F46E5] mb-1">
+                  Terminal Access Portal
                 </div>
-                <span className="inline-block px-2 py-0.5 bg-[#DCFCE7] text-[#15803D] font-mono text-[.72rem] font-bold border border-[#15803D]">
-                  API Online
-                </span>
+                <h2 className="!mb-0 text-2xl sm:text-3xl font-serif font-black text-black">
+                  Welcome to System
+                </h2>
+                <p className="text-xs sm:text-sm text-[#4B5563] mt-1.5 font-normal">
+                  Access your counter point-of-sale, oversee inventory, or onboard a new bookshop organization.
+                </p>
               </div>
 
               {user ? (
-                <div className="py-4 text-center">
-                  <div className="p-3 bg-[#EEF2FF] border-2 border-[#4338CA] text-[#312E81] mb-4 font-medium text-sm">
+                <div className="py-2 text-center space-y-4">
+                  <div className="p-4 bg-[#EEF2FF] border-2 border-[#4338CA] text-[#312E81] text-sm">
                     Authenticated session active for <strong>{user.fullName}</strong> ({user.role})
+                    {user.business?.name && (
+                      <div className="text-xs text-[#4F46E5] mt-1.5 font-mono font-bold">
+                        🏢 {user.business.name}
+                      </div>
+                    )}
                   </div>
                   <Link
                     to={user.role === 'owner' ? '/dashboard' : '/billing'}
-                    className="block w-full py-3 bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold text-center border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:bg-[#CCFF00] hover:text-black transition-all"
+                    className="block w-full py-3.5 bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold text-center border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:bg-[#CCFF00] hover:text-black transition-all"
                   >
-                    Open Workspace ({user.role === 'owner' ? 'Dashboard' : 'Billing'}) →
+                    Open Terminal Workspace ({user.role === 'owner' ? 'Dashboard' : 'POS Billing'}) →
                   </Link>
                 </div>
               ) : (
-                <div>
-                  {/* One-click demo credentials */}
-                  <div className="mb-4 p-2.5 bg-[#FEF9C3] border-2 border-black text-[.8rem]">
-                    <div className="text-[.68rem] uppercase font-mono font-bold text-black mb-1.5 flex items-center justify-between">
-                      <span>Quick Demo Credentials:</span>
-                      <span className="text-muted font-normal">Click to fill</span>
+                <div className="space-y-4">
+                  <div className="space-y-3">
+                    <Link
+                      to="/login"
+                      className="block w-full py-3.5 px-4 bg-[#1A1A1A] hover:bg-[#CCFF00] text-[#CCFF00] hover:text-black font-mono font-bold text-sm text-center border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                    >
+                      🔑 Log In to Existing Account →
+                    </Link>
+
+                    <Link
+                      to="/register"
+                      className="block w-full py-3.5 px-4 bg-[#FAF5FF] hover:bg-[#9333EA] text-[#6B21A8] hover:text-white font-mono font-bold text-sm text-center border-2 border-black shadow-[4px_4px_0px_0px_#9333EA] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                    >
+                      🏢 Sign Up / Register New Bookshop →
+                    </Link>
+                  </div>
+
+                  <div className="pt-4 border-t-2 border-black space-y-2.5">
+                    <div className="text-[.7rem] uppercase font-mono font-bold text-[#6B7280]">
+                      Platform Architecture:
                     </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        type="button"
-                        className="flex-1 py-1.5 px-2 bg-white hover:bg-black hover:text-[#CCFF00] text-black border-2 border-black font-mono font-bold text-xs transition-colors shadow-[2px_2px_0px_0px_#1A1A1A]"
-                        onClick={() => fillDemo('Pratham19106', 'Password123')}
-                      >
-                        ⚡ Fill Owner (Pratham19106)
-                      </button>
-                      <button
-                        type="button"
-                        className="flex-1 py-1.5 px-2 bg-white hover:bg-black hover:text-[#38BDF8] text-black border-2 border-black font-mono font-bold text-xs transition-colors shadow-[2px_2px_0px_0px_#1A1A1A]"
-                        onClick={() => fillDemo('worker', 'Worker123')}
-                      >
-                        🔑 Fill Worker (worker)
-                      </button>
+                    <div className="space-y-1.5 text-xs text-[#374151] font-medium">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#15803D] font-bold">✓</span>
+                        <span>Multi-store franchise support with individual addresses</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#15803D] font-bold">✓</span>
+                        <span>Real-time catalogue with physical shelf coordinates</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#15803D] font-bold">✓</span>
+                        <span>Atomic counter checkout with zero negative stock</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[#15803D] font-bold">✓</span>
+                        <span>Automated vendor price comparison & velocity restocking</span>
+                      </div>
                     </div>
                   </div>
 
-                  <form className="space-y-3.5" onSubmit={submit}>
-                    <Field label="Operator Username" htmlFor="u">
-                      <input
-                        id="u"
-                        className="input border-2 border-black focus:border-[#4F46E5] focus:ring-0 text-sm py-2 px-2.5 font-mono"
-                        value={u}
-                        onChange={(e) => setU(e.target.value)}
-                        placeholder="owner or staff"
-                        autoComplete="username"
-                        required
-                      />
-                    </Field>
-
-                    <Field label="Secret Password" htmlFor="p">
-                      <input
-                        id="p"
-                        type="password"
-                        className="input border-2 border-black focus:border-[#4F46E5] focus:ring-0 text-sm py-2 px-2.5 font-mono"
-                        value={p}
-                        onChange={(e) => setP(e.target.value)}
-                        placeholder="••••••••••••"
-                        autoComplete="current-password"
-                        required
-                      />
-                    </Field>
-
-                    {err && (
-                      <div className="p-2 bg-[#FEE2E2] border-2 border-[#B91C1C] text-[#7F1D1D] font-mono text-xs font-bold">
-                        {err}
-                      </div>
-                    )}
-
-                    <button
-                      type="submit"
-                      className="w-full py-3 bg-[#1A1A1A] hover:bg-[#CCFF00] hover:text-black text-[#CCFF00] font-mono font-bold text-sm uppercase tracking-wider border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all cursor-pointer"
-                      disabled={busy}
-                    >
-                      {busy ? 'Authenticating System…' : 'Enter Store Register (Enter)'}
-                    </button>
-
-                    <div className="pt-3 border-t-2 border-black text-center mt-3">
-                      <Link
-                        to="/register"
-                        className="block w-full py-2 bg-[#FAF5FF] hover:bg-[#F3E8FF] border border-[#9333EA] text-[#6B21A8] font-mono font-bold text-xs shadow-[2px_2px_0px_0px_#9333EA] transition-all"
-                      >
-                        🏢 Register New Bookshop Chain & Outlets →
-                      </Link>
-                    </div>
-
- 
-                  </form>
+                  <div className="pt-2 text-center">
+                    <Link to="/help" className="text-xs font-mono font-bold text-[#4F46E5] hover:underline">
+                      📖 View Help & System Manual →
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
@@ -330,7 +284,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Rolling Banner 2: Moving in Reverse with Accent Color */}
+      {/* Rolling Banner */}
       <div className="bg-[#CCFF00] text-black py-2.5 border-b-2 border-black overflow-hidden relative">
         <div className="marquee-track flex text-[.82rem] font-mono tracking-wider uppercase font-black">
           <div className="marquee-content-reverse flex items-center gap-6 pr-6">
@@ -409,13 +363,13 @@ export default function Landing() {
             <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Reserved Stock Protection</h3>
             <p className="text-[.9rem] text-[#4B5563] leading-relaxed">
               When a customer calls to reserve a book, stock is placed into <code>reserved</code> status immediately. 
-              The counter POS will refuse to sell that copy to a walk-in, eliminating humiliating customer apologies.
+              The counter POS will refuse to sell that copy to a walk-in, eliminating customer apologies.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Section 2: The 7 Core Modules Horizontal Showcase & Filter */}
+      {/* Section 2: The 7 Core Modules Showcase & Filter */}
       <section id="features" className="max-w-[1340px] mx-auto py-16 px-4 border-b-2 border-black">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
           <div>
@@ -445,7 +399,7 @@ export default function Landing() {
           </div>
         </div>
 
-        {/* Horizontal Scroll Track / Carousel */}
+        {/* Horizontal Scroll Track */}
         <div className="flex overflow-x-auto gap-5 pb-6 pt-2 snap-x scrollbar-thin scrollbar-thumb-black">
           {filteredModules.map((m) => (
             <div
@@ -458,7 +412,7 @@ export default function Landing() {
                     MODULE {m.num}
                   </span>
                   <span className="font-mono text-xs font-bold text-muted bg-[#F3F4F6] px-2 py-0.5 border border-hair">
-                    {m.stat}
+                    {m.tag}
                   </span>
                 </div>
 
@@ -488,9 +442,7 @@ export default function Landing() {
         </div>
       </section>
 
-
-
-      {/* Section 4: Daily Operating Workflows */}
+      {/* Section 3: Daily Operating Workflows */}
       <section id="workflows" className="max-w-[1340px] mx-auto py-16 px-4 border-b-2 border-black">
         <div className="mb-10 text-center max-w-3xl mx-auto">
           <span className="bg-[#FEF3C7] text-[#B45309] font-mono text-xs font-bold uppercase px-3 py-1 border border-[#B45309] mb-3 inline-block">
@@ -500,7 +452,7 @@ export default function Landing() {
             A Day in the Life with the System
           </h2>
           <p className="text-base text-[#4B5563]">
-            Follow standardized, bulletproof daily routines designed for maximum counter speed and inventory precision.
+            Follow standardized routines designed for maximum counter speed and inventory precision.
           </p>
         </div>
 
@@ -512,7 +464,7 @@ export default function Landing() {
               </div>
               <h3 className="!mt-0 !mb-2 text-lg font-serif font-bold text-black">Morning Review</h3>
               <p className="text-[.85rem] text-[#4B5563] leading-relaxed mb-3">
-                Open Restocking to check Critical alert titles. Review computed sales velocity and dispatch POs to the cheapest quoted vendor with 1 click.
+                Open Restocking to check Critical alert titles. Review computed sales velocity and dispatch POs to the cheapest vendor with 1 click.
               </p>
             </div>
             <div className="pt-2 border-t border-hair font-mono text-[.75rem] text-navy font-bold">
@@ -555,9 +507,9 @@ export default function Landing() {
               <div className="w-8 h-8 bg-[#BE123C] text-white font-mono font-black flex items-center justify-center mb-3">
                 4
               </div>
-              <h3 className="!mt-0 !mb-2 text-lg font-serif font-bold text-black">Nightly Hot Backup</h3>
+              <h3 className="!mt-0 !mb-2 text-lg font-serif font-bold text-black">Closing Operations</h3>
               <p className="text-[.85rem] text-[#4B5563] leading-relaxed mb-3">
-                Review Dashboard for Net Sales and Gross Profit. Log daily overheads in Expenses. Run automated online backup command.
+                Review Dashboard for Net Sales and Gross Profit. Log daily overheads in Expenses. Keep historical audits pristine.
               </p>
             </div>
             <div className="pt-2 border-t border-hair font-mono text-[.75rem] text-brick font-bold">
@@ -567,7 +519,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Section 5: Permissions & Role Matrix */}
+      {/* Section 4: Permissions & Role Matrix */}
       <section id="roles" className="max-w-[1340px] mx-auto py-16 px-4 border-b-2 border-black">
         <div className="mb-8">
           <span className="bg-[#EDE9FE] text-[#6D28D9] font-mono text-xs font-bold uppercase px-3 py-1 border border-[#6D28D9] mb-2 inline-block">
@@ -625,9 +577,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Section 6: Terminal & Production Reference */}
-
-      {/* Footer: Modern High Contrast */}
+      {/* Footer */}
       <footer className="bg-[#1A1A1A] text-white border-t-4 border-black py-12 px-4">
         <div className="max-w-[1340px] mx-auto flex flex-wrap justify-between items-center gap-6">
           <div>
@@ -636,7 +586,7 @@ export default function Landing() {
               <span className="font-serif font-black text-xl text-white">Bookshop Automation System</span>
             </div>
             <div className="font-mono text-xs text-white/60">
-              Single-Store Physical Retail Architecture 
+              Multi-Store Retail & Franchise Architecture
             </div>
           </div>
 
