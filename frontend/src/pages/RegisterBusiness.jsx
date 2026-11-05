@@ -17,21 +17,14 @@ export default function RegisterBusiness() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
-  // Outlets List (Enforcing >= 2 outlets constraint)
+  // Outlets List (Optional during initial business onboarding)
   const [outlets, setOutlets] = useState([
     {
-      name: 'Central Flagship Store (HQ)',
-      city: 'Hyderabad',
-      address: 'Main Commercial Boulevard, Road No. 1, Banjara Hills',
-      phone: '040-6500 1122',
+      name: 'Flagship Store (HQ)',
+      city: 'Mumbai',
+      address: '100 Commercial Boulevard, Fort, Mumbai - 400 001',
+      phone: '022-6500 1122',
       isHeadquarters: true,
-    },
-    {
-      name: 'Cyber Gateway Outlet',
-      city: 'Hyderabad',
-      address: 'Ground Floor, Tech Park, Hitec City',
-      phone: '040-6500 3344',
-      isHeadquarters: false,
     },
   ]);
 
@@ -43,7 +36,7 @@ export default function RegisterBusiness() {
     setErr('');
 
     if (!businessName.trim()) {
-      setErr('Please enter the bookshop chain / business name.');
+      setErr('Please enter the bookshop business / chain name.');
       return;
     }
     if (!ownerName.trim()) {
@@ -58,19 +51,15 @@ export default function RegisterBusiness() {
       setErr('Password must be at least 8 characters.');
       return;
     }
-    if (outlets.length < 2) {
-      setErr('Constraint Violation: A minimum of 2 outlets is required for multi-franchise chain registration.');
-      return;
-    }
     for (let i = 0; i < outlets.length; i++) {
       if (!outlets[i].name.trim()) {
-        setErr(`Outlet #${i + 1} must have a branch name.`);
+        setErr(`Outlet #${i + 1} must have a valid branch name.`);
         return;
       }
     }
 
     try {
-      const res = await registerBusiness({
+      await registerBusiness({
         businessName: businessName.trim(),
         ownerName: ownerName.trim(),
         username: username.trim(),
@@ -93,7 +82,6 @@ export default function RegisterBusiness() {
       const copy = [...prev];
       copy[index] = { ...copy[index], [key]: val };
       if (key === 'isHeadquarters' && val) {
-        // Only one HQ allowed
         copy.forEach((o, i) => {
           if (i !== index) o.isHeadquarters = false;
         });
@@ -106,23 +94,19 @@ export default function RegisterBusiness() {
     setOutlets((prev) => [
       ...prev,
       {
-        name: `Branch Outlet ${prev.length + 1}`,
-        city: 'Hyderabad',
+        name: `Branch Store ${prev.length + 1}`,
+        city: 'Mumbai',
         address: '',
         phone: '',
-        isHeadquarters: false,
+        isHeadquarters: prev.length === 0,
       },
     ]);
   };
 
   const removeOutlet = (index) => {
-    if (outlets.length <= 2) {
-      setErr('System constraint requires at least 2 active outlets for any registered bookshop chain.');
-      return;
-    }
     setOutlets((prev) => {
       const filtered = prev.filter((_, i) => i !== index);
-      if (!filtered.some((o) => o.isHeadquarters)) {
+      if (filtered.length > 0 && !filtered.some((o) => o.isHeadquarters)) {
         filtered[0].isHeadquarters = true;
       }
       return filtered;
@@ -145,9 +129,9 @@ export default function RegisterBusiness() {
         isHeadquarters: true,
       },
       {
-        name: `${chainName} - ${city2} Uptown Mall`,
+        name: `${chainName} - ${city2} Uptown Branch`,
         city: city2,
-        address: `Level 2, Phoenix Center, ${city2}`,
+        address: `Level 2, Phoenix Centre, ${city2}`,
         phone: '040-6200 2222',
         isHeadquarters: false,
       },
@@ -168,16 +152,16 @@ export default function RegisterBusiness() {
           <div className="flex flex-wrap items-center justify-between pb-4 mb-6 border-b-2 border-black gap-2">
             <div>
               <div className="text-[.72rem] uppercase tracking-wider font-mono font-bold text-[#4F46E5] flex items-center gap-1.5">
-                <span>🏢 Chain Registration</span>
+                <span>🏢 New Business Setup</span>
                 <span className="w-1.5 h-1.5 bg-[#4F46E5] rounded-full"></span>
-                <span>Multi-Outlet Architecture</span>
+                <span>Custom Storefronts & Addresses</span>
               </div>
               <h1 className="!border-0 !mb-0 text-3xl font-serif font-black text-black">
-                Register New Bookshop Chain
+                Register Your Bookshop Business
               </h1>
             </div>
-            <span className="inline-block px-2.5 py-1 bg-[#EEF2FF] text-[#4F46E5] font-mono text-xs font-bold border-2 border-[#4F46E5]">
-              Constraint: ≥ 2 Outlets
+            <span className="inline-block px-2.5 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border-2 border-[#15803D]">
+              Direct Setup
             </span>
           </div>
 
@@ -211,17 +195,17 @@ export default function RegisterBusiness() {
             <div className="p-4 bg-[#FAF9F5] border-2 border-black">
               <h2 className="text-sm font-mono font-black uppercase text-black mb-3 flex items-center gap-2">
                 <span className="w-5 h-5 bg-[#1A1A1A] text-[#CCFF00] flex items-center justify-center text-xs">1</span>
-                Bookshop Chain Details
+                Bookshop Business Details
               </h2>
               <div className="grid sm:grid-cols-2 gap-3.5">
                 <div className="sm:col-span-2">
-                  <Field label="Bookshop Chain / Brand Name" htmlFor="bizName">
+                  <Field label="Bookshop Name / Brand" htmlFor="bizName">
                     <input
                       id="bizName"
                       className="input font-sans text-sm font-semibold"
                       value={businessName}
                       onChange={(e) => setBusinessName(e.target.value)}
-                      placeholder="e.g. Oxford Bookstores or Crossword Chain"
+                      placeholder="e.g. Oxford Bookstores or Landmark Books"
                       required
                     />
                   </Field>
@@ -257,7 +241,7 @@ export default function RegisterBusiness() {
             <div className="p-4 bg-[#FAF9F5] border-2 border-black">
               <h2 className="text-sm font-mono font-black uppercase text-black mb-3 flex items-center gap-2">
                 <span className="w-5 h-5 bg-[#1A1A1A] text-[#CCFF00] flex items-center justify-center text-xs">2</span>
-                Owner & Super-Admin Credentials
+                Owner Credentials
               </h2>
               <div className="grid sm:grid-cols-3 gap-3.5">
                 <div>
@@ -302,53 +286,57 @@ export default function RegisterBusiness() {
               </div>
             </div>
 
-            {/* 3. Outlets Repeater (Enforcing >= 2 outlets) */}
+            {/* 3. Outlets Repeater (Optional during registration) */}
             <div className="p-4 bg-[#FAF9F5] border-2 border-black">
-              <div className="flex flex-wrap items-center justify-between mb-3 gap-2">
+              <div className="flex flex-wrap items-center justify-between mb-2 gap-2">
                 <h2 className="text-sm font-mono font-black uppercase text-black flex items-center gap-2">
                   <span className="w-5 h-5 bg-[#1A1A1A] text-[#CCFF00] flex items-center justify-center text-xs">3</span>
-                  Franchise Outlets Setup ({outlets.length} Branches)
+                  Storefronts & Outlets ({outlets.length} Configured)
                 </h2>
-                <span className="text-[.7rem] font-mono font-bold text-[#15803D] bg-[#DCFCE7] px-2 py-0.5 border border-[#15803D]">
-                  ✓ Constraint Satisfied (≥ 2)
+                <span className="text-[.7rem] font-mono font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-0.5 border border-[#4F46E5]">
+                  Add Outlets Now or Later
                 </span>
               </div>
 
               <p className="text-xs text-[#4B5563] mb-4">
-                Each registered bookshop chain must maintain at least 2 distinct physical outlets. You can assign one as Headquarters.
+                Configure your physical stores and branches below with their individual addresses, or skip and add them anytime from the app.
               </p>
 
-              <div className="space-y-3.5">
-                {outlets.map((outlet, idx) => (
-                  <div
-                    key={idx}
-                    className={`p-3.5 border-2 ${
-                      outlet.isHeadquarters ? 'border-[#4F46E5] bg-[#F5F3FF]' : 'border-black bg-white'
-                    } shadow-[3px_3px_0px_0px_#1A1A1A]`}
-                  >
-                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-300">
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-black bg-black text-white px-2 py-0.5">
-                          Outlet #{idx + 1}
-                        </span>
-                        {outlet.isHeadquarters && (
-                          <span className="bg-[#4F46E5] text-white font-mono text-[10px] font-bold px-2 py-0.5 uppercase">
-                            Headquarters (HQ)
+              {outlets.length === 0 ? (
+                <div className="p-4 bg-white border-2 border-dashed border-gray-400 text-center mb-3 text-xs text-muted font-mono">
+                  No outlets added yet. You can register your business first and create stores later.
+                </div>
+              ) : (
+                <div className="space-y-3.5">
+                  {outlets.map((outlet, idx) => (
+                    <div
+                      key={idx}
+                      className={`p-3.5 border-2 ${
+                        outlet.isHeadquarters ? 'border-[#4F46E5] bg-[#F5F3FF]' : 'border-black bg-white'
+                      } shadow-[3px_3px_0px_0px_#1A1A1A]`}
+                    >
+                      <div className="flex items-center justify-between pb-2 mb-2 border-b border-gray-300">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-black bg-black text-white px-2 py-0.5">
+                            Shop #{idx + 1}
                           </span>
-                        )}
-                      </div>
+                          {outlet.isHeadquarters && (
+                            <span className="bg-[#4F46E5] text-white font-mono text-[10px] font-bold px-2 py-0.5 uppercase">
+                              Headquarters (HQ)
+                            </span>
+                          )}
+                        </div>
 
-                      <div className="flex items-center gap-2">
-                        <label className="text-xs font-mono font-bold cursor-pointer flex items-center gap-1 select-none">
-                          <input
-                            type="checkbox"
-                            checked={!!outlet.isHeadquarters}
-                            onChange={(e) => updateOutlet(idx, 'isHeadquarters', e.target.checked)}
-                            className="checkbox"
-                          />
-                          <span>HQ</span>
-                        </label>
-                        {outlets.length > 2 && (
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-mono font-bold cursor-pointer flex items-center gap-1 select-none">
+                            <input
+                              type="checkbox"
+                              checked={!!outlet.isHeadquarters}
+                              onChange={(e) => updateOutlet(idx, 'isHeadquarters', e.target.checked)}
+                              className="checkbox"
+                            />
+                            <span>HQ</span>
+                          </label>
                           <button
                             type="button"
                             onClick={() => removeOutlet(idx)}
@@ -357,47 +345,47 @@ export default function RegisterBusiness() {
                           >
                             ✕ Remove
                           </button>
-                        )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="grid sm:grid-cols-2 gap-2.5">
-                      <div>
-                        <Field label="Branch / Outlet Name">
-                          <input
-                            className="input font-sans text-xs font-medium"
-                            value={outlet.name}
-                            onChange={(e) => updateOutlet(idx, 'name', e.target.value)}
-                            placeholder="e.g. Flagship Store (HQ)"
-                            required
-                          />
-                        </Field>
-                      </div>
-                      <div>
-                        <Field label="City">
-                          <input
-                            className="input font-sans text-xs"
-                            value={outlet.city}
-                            onChange={(e) => updateOutlet(idx, 'city', e.target.value)}
-                            placeholder="e.g. Hyderabad"
-                            required
-                          />
-                        </Field>
-                      </div>
-                      <div className="sm:col-span-2">
-                        <Field label="Physical Address">
-                          <input
-                            className="input font-sans text-xs"
-                            value={outlet.address}
-                            onChange={(e) => updateOutlet(idx, 'address', e.target.value)}
-                            placeholder="Shop 101, Commercial Avenue, Landmark"
-                          />
-                        </Field>
+                      <div className="grid sm:grid-cols-2 gap-2.5">
+                        <div>
+                          <Field label="Store / Outlet Name">
+                            <input
+                              className="input font-sans text-xs font-medium"
+                              value={outlet.name}
+                              onChange={(e) => updateOutlet(idx, 'name', e.target.value)}
+                              placeholder="e.g. Flagship Store (HQ)"
+                              required
+                            />
+                          </Field>
+                        </div>
+                        <div>
+                          <Field label="City">
+                            <input
+                              className="input font-sans text-xs"
+                              value={outlet.city}
+                              onChange={(e) => updateOutlet(idx, 'city', e.target.value)}
+                              placeholder="e.g. Mumbai or Hyderabad"
+                              required
+                            />
+                          </Field>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <Field label="Physical Address (Unique to this Shop)">
+                            <input
+                              className="input font-sans text-xs"
+                              value={outlet.address}
+                              onChange={(e) => updateOutlet(idx, 'address', e.target.value)}
+                              placeholder="Shop 101, Commercial Avenue, Distinct Street"
+                            />
+                          </Field>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
 
               <div className="mt-3.5">
                 <button
@@ -405,7 +393,7 @@ export default function RegisterBusiness() {
                   onClick={addOutlet}
                   className="btn btn-sm bg-white hover:bg-black hover:text-[#CCFF00] border-2 border-black font-mono text-xs font-bold shadow-[2px_2px_0px_0px_#1A1A1A] w-full py-2"
                 >
-                  + Add Another Outlet / Branch
+                  + Add Store / Outlet with Unique Address
                 </button>
               </div>
             </div>
@@ -418,7 +406,7 @@ export default function RegisterBusiness() {
 
             {success && (
               <div className="p-3 bg-[#DCFCE7] border-2 border-[#15803D] text-[#15803D] font-mono text-xs font-bold animate-slide-up">
-                ✓ Business and outlets created successfully! Launching terminal workspace…
+                ✓ Business created successfully! Launching terminal workspace…
               </div>
             )}
 
@@ -427,7 +415,7 @@ export default function RegisterBusiness() {
               className="btn btn-primary w-full py-3.5 text-sm uppercase tracking-wider font-mono font-bold shadow-[4px_4px_0px_0px_#4F46E5]"
               disabled={busy || success}
             >
-              {busy ? 'Registering Chain & Outlets…' : 'Onboard Business Chain & Open Terminal →'}
+              {busy ? 'Registering Business…' : 'Complete Registration & Open Terminal →'}
             </button>
           </form>
 
@@ -444,4 +432,3 @@ export default function RegisterBusiness() {
     </div>
   );
 }
-

@@ -120,10 +120,6 @@ function registerBusiness(db, input) {
   const phone = input.phone ? String(input.phone).trim() : '';
   const outlets = Array.isArray(input.outlets) ? input.outlets : [];
 
-  if (outlets.length < 2) {
-    throw badRequest('Constraint Requirement: A minimum of 2 outlets/franchises is required to register a bookshop chain.');
-  }
-
   for (let i = 0; i < outlets.length; i++) {
     const o = outlets[i];
     if (!o || typeof o !== 'object' || !o.name || !String(o.name).trim()) {
@@ -180,24 +176,7 @@ function registerBusiness(db, input) {
     const userId = Number(r.lastInsertRowid);
     const userRow = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
 
-    // 4. Starter catalogue for new chain
-    const starterBooks = [
-      ['Atomic Habits', 'James Clear', 'Self-Help', 49900, 25, 'A', '1', '1'],
-      ['The Psychology of Money', 'Morgan Housel', 'Finance', 39900, 20, 'A', '1', '2'],
-      ['Deep Work', 'Cal Newport', 'Self-Help', 45000, 15, 'A', '2', '1'],
-      ['Sapiens', 'Yuval Noah Harari', 'History', 55000, 18, 'B', '1', '1'],
-      ['Clean Code', 'Robert C. Martin', 'Science & Tech', 89900, 12, 'B', '2', '1'],
-      ['The Alchemist', 'Paulo Coelho', 'Fiction', 29900, 30, 'C', '1', '1'],
-    ];
-
-    starterBooks.forEach(([title, author, genre, priceCents, qty, aisle, rack, shelf], idx) => {
-      const isbn = `978${String(8000000000 + idx * 1337).slice(0, 10)}`;
-      db.prepare(`INSERT INTO books(title, author, isbn, genre, price_cents, cost_cents, stock_qty, aisle, rack, shelf, business_id)
-                  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(title, author, isbn, genre, priceCents, Math.round(priceCents * 0.6), qty, aisle, rack, shelf, businessId);
-    });
-
-    // 5. Generate Session Token
+    // 4. Generate Session Token
     const token = crypto.randomBytes(32).toString('hex');
     const expires = new Date(Date.now() + config.sessionHours * 3600 * 1000).toISOString();
     db.prepare('INSERT INTO sessions(token_hash, user_id, expires_at) VALUES (?, ?, ?)').run(hashToken(token), userId, expires);
@@ -265,12 +244,38 @@ function resetPassword(db, id, newPassword) {
   db.prepare('DELETE FROM sessions WHERE user_id = ?').run(id);
 }
 
+function createFranchise(db, user, input) {
+  v.object(input);
+  const name = v.str(input.name, 'name', { required: true, max: 100 });
+  const city = input.city ? String(input.city).trim() : '';
+  const address = input.address ? String(input.address).trim() : '';
+  const phone = input.phone ? String(input.phone).trim() : '';
+  const email = input.email ? String(input.email).trim() : '';
+  const isHq = !!input.isHeadquarters;
+  const businessId = user.business_id || 'biz_default';
+
+  const count = db.prepare('SELECT COUNT(*) c FROM franchises WHERE business_id = ?').get(businessId).c;
+  const franchiseId = `${businessId}_fr_${count + 1}`;
+  const code = `FR-${String(count + 1).padStart(3, '0')}`;
+
+  return tx(db, () => {
+    if (isHq) {
+      db.prepare('UPDATE franchises SET is_headquarters = 0 WHERE business_id = ?').run(businessId);
+    }
+    db.prepare(`INSERT INTO franchises(id, business_id, code, name, city, address, phone, email, is_headquarters, status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')`)
+      .run(franchiseId, businessId, code, name, city, address, phone, email, isHq ? 1 : (count === 0 ? 1 : 0));
+    return db.prepare('SELECT * FROM franchises WHERE id = ?').get(franchiseId);
+  });
+}
+
 module.exports = {
   login,
   logout,
   userForToken,
   createUser,
   registerBusiness,
+  createFranchise,
   listUsers,
   setActive,
   changePassword,

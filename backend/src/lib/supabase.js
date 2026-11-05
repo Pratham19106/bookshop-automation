@@ -30,7 +30,7 @@ async function syncBusinessToSupabase({ business, outlets, user }) {
     });
 
     // 2. Sync franchises
-    if (Array.isArray(outlets) && outlets.length >= 2) {
+    if (Array.isArray(outlets) && outlets.length > 0) {
       const rows = outlets.map((o) => ({
         id: o.id,
         business_id: business.id,

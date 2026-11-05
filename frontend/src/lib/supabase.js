@@ -42,7 +42,7 @@ export async function getFranchises() {
       .eq('status', 'active')
       .order('is_headquarters', { ascending: false });
 
-    if (!error && data && data.length >= 2) {
+    if (!error && data && data.length > 0) {
       return data;
     }
   } catch (err) {

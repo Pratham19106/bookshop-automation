@@ -99,6 +99,10 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
     const rows = db.prepare("SELECT * FROM franchises WHERE business_id = ? AND status = 'active' ORDER BY is_headquarters DESC, name ASC").all(bizId);
     ok(res, rows);
   });
+  api.post('/franchises', owner, (req, res) => {
+    const f = users.createFranchise(db, req.user, req.body || {});
+    ok(res, f, 201);
+  });
 
   // ---- settings & users
   api.get('/settings', authed, (req, res) => ok(res, settings.publicSettings(db)));

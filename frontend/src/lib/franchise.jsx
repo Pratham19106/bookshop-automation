@@ -13,7 +13,7 @@ export function FranchiseProvider({ children }) {
   });
 
   useEffect(() => {
-    if (user?.franchises && Array.isArray(user.franchises) && user.franchises.length >= 2) {
+    if (user?.franchises && Array.isArray(user.franchises) && user.franchises.length > 0) {
       setFranchises(user.franchises);
       if (!user.franchises.some((f) => f.id === activeId)) {
         setActiveId(user.franchises[0].id);
@@ -23,7 +23,7 @@ export function FranchiseProvider({ children }) {
 
     let mounted = true;
     getFranchises().then((list) => {
-      if (mounted && list && list.length >= 2) {
+      if (mounted && list && list.length > 0) {
         setFranchises(list);
         if (!list.some((f) => f.id === activeId)) {
           setActiveId(list[0].id);
@@ -48,9 +48,9 @@ export function FranchiseProvider({ children }) {
     () => ({
       franchises,
       currentFranchise,
-      activeId: currentFranchise.id,
+      activeId: currentFranchise ? currentFranchise.id : '',
       selectFranchise,
-      hasMultiFranchiseConstraint: franchises.length >= 2,
+      hasOutlets: franchises.length > 0,
     }),
     [franchises, currentFranchise]
   );
@@ -66,7 +66,7 @@ export function useFranchise() {
       currentFranchise: DEFAULT_FRANCHISES[0],
       activeId: DEFAULT_FRANCHISES[0].id,
       selectFranchise: () => {},
-      hasMultiFranchiseConstraint: true,
+      hasOutlets: true,
     };
   }
   return ctx;
