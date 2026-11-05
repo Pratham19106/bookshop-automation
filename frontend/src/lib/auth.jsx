@@ -31,6 +31,7 @@ export function AuthProvider({ children }) {
   const value = useMemo(() => ({
     user, settings, setSettings, ready, isOwner: user?.role === 'owner',
     login: async (username, password) => { await post('/auth/login', { username, password }); await load(); },
+    registerBusiness: async (data) => { const res = await post('/auth/register-business', data); await load(); return res; },
     logout: async () => { try { await post('/auth/logout'); } finally { setUser(null); } },
   }), [user, settings, ready, load, setSettings]);
 

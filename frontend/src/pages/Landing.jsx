@@ -153,6 +153,9 @@ export default function Landing() {
             <Link to="/help" className="px-3 py-1 bg-[#EEF2FF] text-[#4F46E5] border border-[#4F46E5] font-bold hover:bg-[#4F46E5] hover:text-white transition-all ml-1">
               📖 Help Manual →
             </Link>
+            <Link to="/register" className="px-3 py-1 bg-[#FAF5FF] text-[#6B21A8] border-2 border-[#9333EA] font-mono font-bold hover:bg-[#9333EA] hover:text-white transition-all ml-1 shadow-[2px_2px_0px_0px_#9333EA]">
+              🏢 Register Chain →
+            </Link>
             {user ? (
               <Link to="/dashboard" className="px-3 py-1 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black font-mono font-bold hover:bg-[#CCFF00] hover:text-black transition-all ml-2 shadow-[2px_2px_0px_0px_#1A1A1A]">
                 Launch App ({user.username}) →
@@ -198,6 +201,9 @@ export default function Landing() {
 
             {/* CTA Buttons */}
             <div className="flex flex-wrap items-center gap-3">
+              <Link to="/register" className="px-5 py-3 bg-[#9333EA] text-white font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:bg-[#7E22CE] hover:translate-x-[2px] hover:translate-y-[2px] transition-all">
+                🏢 REGISTER NEW BOOKSHOP CHAIN →
+              </Link>
               <button onClick={() => scrollTo('features')} className="px-5 py-3 bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_0px_#4F46E5] transition-all">
                 EXPLORE ALL 7 MODULES ↓
               </button>
@@ -305,6 +311,15 @@ export default function Landing() {
                     >
                       {busy ? 'Authenticating System…' : 'Enter Store Register (Enter)'}
                     </button>
+
+                    <div className="pt-3 border-t-2 border-black text-center mt-3">
+                      <Link
+                        to="/register"
+                        className="block w-full py-2 bg-[#FAF5FF] hover:bg-[#F3E8FF] border border-[#9333EA] text-[#6B21A8] font-mono font-bold text-xs shadow-[2px_2px_0px_0px_#9333EA] transition-all"
+                      >
+                        🏢 Register New Bookshop Chain & Outlets →
+                      </Link>
+                    </div>
 
  
                   </form>

@@ -60,6 +60,16 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
   const ok = (res, data, status = 200) => res.status(status).json(data);
 
   // ---- auth
+  api.post('/auth/register-business', (req, res) => {
+    const result = users.registerBusiness(db, req.body || {});
+    res.cookie('sid', result.token, { httpOnly: true, sameSite: 'strict', secure: config.secureCookies, maxAge: config.sessionHours * 3600 * 1000, path: '/' });
+    ok(res, result, 201);
+  });
+  api.post('/auth/register', (req, res) => {
+    const result = users.registerBusiness(db, req.body || {});
+    res.cookie('sid', result.token, { httpOnly: true, sameSite: 'strict', secure: config.secureCookies, maxAge: config.sessionHours * 3600 * 1000, path: '/' });
+    ok(res, result, 201);
+  });
   api.post('/auth/login', (req, res) => {
     const { token, user } = users.login(db, req.body || {}, req.ip);
     res.cookie('sid', token, { httpOnly: true, sameSite: 'strict', secure: config.secureCookies, maxAge: config.sessionHours * 3600 * 1000, path: '/' });
@@ -70,8 +80,25 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
     res.clearCookie('sid', { path: '/' });
     ok(res, { ok: true });
   });
-  api.get('/auth/me', authed, (req, res) => ok(res, { user: users.publicUser(req.user) }));
+  api.get('/auth/me', authed, (req, res) => {
+    const business = req.user.business_id ? db.prepare('SELECT * FROM businesses WHERE id = ?').get(req.user.business_id) : null;
+    const franchises = req.user.business_id ? db.prepare("SELECT * FROM franchises WHERE business_id = ? AND status = 'active'").all(req.user.business_id) : [];
+    ok(res, {
+      user: {
+        ...users.publicUser(req.user),
+        business: business ? { id: business.id, name: business.name, slug: business.slug } : null,
+        franchises: franchises.length > 0 ? franchises : null,
+      }
+    });
+  });
   api.post('/auth/password', authed, (req, res) => { users.changePassword(db, req.user, req.body || {}); ok(res, { ok: true }); });
+
+  // ---- franchises (multi-franchise directory)
+  api.get('/franchises', (req, res) => {
+    const bizId = req.user?.business_id || 'biz_default';
+    const rows = db.prepare("SELECT * FROM franchises WHERE business_id = ? AND status = 'active' ORDER BY is_headquarters DESC, name ASC").all(bizId);
+    ok(res, rows);
+  });
 
   // ---- settings & users
   api.get('/settings', authed, (req, res) => ok(res, settings.publicSettings(db)));

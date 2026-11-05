@@ -108,7 +108,17 @@ export default function Login() {
             </div>
           </div>
 
-          <div className="mt-4 text-center">
+          {/* Multi-Tenant Registration Link */}
+          <div className="mt-4 pt-3 border-t-2 border-black">
+            <Link
+              to="/register"
+              className="block w-full py-2.5 bg-[#FAF5FF] hover:bg-[#F3E8FF] border-2 border-[#9333EA] text-[#6B21A8] font-mono font-bold text-xs text-center shadow-[2px_2px_0px_0px_#9333EA] transition-all"
+            >
+              🏢 Onboard New Chain: Register Business →
+            </Link>
+          </div>
+
+          <div className="mt-3 text-center">
             <Link to="/landing" className="text-xs font-mono font-bold text-[#4F46E5] hover:underline">
               ← Return to Platform Overview
             </Link>

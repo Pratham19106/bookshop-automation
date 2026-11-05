@@ -1,15 +1,26 @@
 import { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { useAuth } from './auth';
 import { DEFAULT_FRANCHISES, getFranchises } from './supabase';
 
 const FranchiseContext = createContext(null);
 
 export function FranchiseProvider({ children }) {
+  const auth = useAuth();
+  const user = auth?.user;
   const [franchises, setFranchises] = useState(DEFAULT_FRANCHISES);
   const [activeId, setActiveId] = useState(() => {
     return localStorage.getItem('bk_active_franchise') || DEFAULT_FRANCHISES[0].id;
   });
 
   useEffect(() => {
+    if (user?.franchises && Array.isArray(user.franchises) && user.franchises.length >= 2) {
+      setFranchises(user.franchises);
+      if (!user.franchises.some((f) => f.id === activeId)) {
+        setActiveId(user.franchises[0].id);
+      }
+      return;
+    }
+
     let mounted = true;
     getFranchises().then((list) => {
       if (mounted && list && list.length >= 2) {
@@ -22,7 +33,7 @@ export function FranchiseProvider({ children }) {
     return () => {
       mounted = false;
     };
-  }, [activeId]);
+  }, [user, activeId]);
 
   const selectFranchise = (id) => {
     setActiveId(id);
@@ -60,4 +71,3 @@ export function useFranchise() {
   }
   return ctx;
 }
-

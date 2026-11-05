@@ -19,6 +19,7 @@ import Receipt from './pages/Receipt';
 import Landing from './pages/Landing';
 import Help from './pages/Help';
 import Shelves from './pages/Shelves';
+import RegisterBusiness from './pages/RegisterBusiness';
 
 // path -> sidebar group, title, component, owner-only flag
 const PAGES = [
@@ -211,6 +212,9 @@ export default function App() {
     }
     if (pathname === '/login') {
       return <Login />;
+    }
+    if (pathname === '/register' || pathname === '/register-business') {
+      return <RegisterBusiness />;
     }
     return <Landing />;
   }
