@@ -11,6 +11,7 @@ import '@fontsource/inter/600.css';
 import './index.css';
 import App from './App';
 import { AuthProvider } from './lib/auth';
+import { FranchiseProvider } from './lib/franchise';
 import { Overlays } from './lib/overlays';
 
 createRoot(document.getElementById('root')).render(
@@ -19,8 +20,10 @@ createRoot(document.getElementById('root')).render(
     <MotionConfig reducedMotion="user">
       <HashRouter>
         <AuthProvider>
-          <App />
-          <Overlays />
+          <FranchiseProvider>
+            <App />
+            <Overlays />
+          </FranchiseProvider>
         </AuthProvider>
       </HashRouter>
     </MotionConfig>

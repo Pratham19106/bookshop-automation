@@ -9,7 +9,7 @@ import { EASE, Reveal, Stagger, StaggerItem } from '../lib/motion';
 import { Async, Badge, Empty, PageTitle, Tile, tone } from '../lib/ui';
 
 // Net sales over time. The line draws itself in (slowly), then the area beneath it fades up.
-function LineChart({ series }) {
+function Bars({ series }) {
   if (!series.length) return <Empty>No sales in this period.</Empty>;
   const W = 600; const H = 190; const PAD = { l: 8, r: 8, t: 14, b: 8 };
   const max = Math.max(...series.map((s) => s.netSalesCents), 1);
@@ -39,7 +39,7 @@ function LineChart({ series }) {
   );
 }
 
-function RuledBars({ rows, name, value, format = fmt }) {
+function HBars({ rows, name, value, format = fmt }) {
   if (!rows.length) return <Empty>Nothing in this period.</Empty>;
   const max = Math.max(...rows.map(value), 1);
   return rows.map((r, i) => (

@@ -42,6 +42,10 @@
 }
 
 @layer components {
+  .cover {
+    @apply relative overflow-hidden pointer-events-none select-none;
+  }
+
   /* Neo-Brutalist Buttons */
   .btn {
     @apply inline-flex items-center justify-center px-3.5 py-1.5 border-2 border-black bg-white text-black font-mono font-bold text-xs uppercase cursor-pointer no-underline shadow-hard-sm hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none active:translate-x-[2px] active:translate-y-[2px] disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none transition-all duration-100;

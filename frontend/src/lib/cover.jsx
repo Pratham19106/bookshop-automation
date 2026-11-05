@@ -15,14 +15,20 @@ export function BookCover({ book, w = 84, className = '' }) {
   const variant = (seed >>> 4) % 3;
   const fs = Math.max(6, w / 9);
   const initial = book.title.replace(/^(the|a|an)\s+/i, '')[0]?.toUpperCase() || '?';
-  const style = { width: w, background: tone };
+  const style = { width: w, aspectRatio: '2/3', background: tone };
 
   // too small to read a title: just the monogram
   if (w < 36) {
-    return <div className={`cover ${className}`} style={style} aria-hidden="true"><span className="absolute inset-0 grid place-items-center font-serif" style={{ fontSize: w * 0.5 }}>{initial}</span></div>;
+    return (
+      <div className={`relative overflow-hidden pointer-events-none cover ${className}`} style={style} aria-hidden="true">
+        <span className="absolute inset-0 grid place-items-center font-serif" style={{ fontSize: w * 0.5 }}>
+          {initial}
+        </span>
+      </div>
+    );
   }
   return (
-    <div className={`cover ${className}`} style={style} role="img" aria-label={`Cover of ${book.title}`}>
+    <div className={`relative overflow-hidden pointer-events-none cover ${className}`} style={style} role="img" aria-label={`Cover of ${book.title}`}>
       {variant === 0 && (
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center" style={{ padding: `${w * 0.14}px ${w * 0.16}px ${w * 0.14}px ${w * 0.22}px` }}>
           <div className="bg-paper/60" style={{ width: '40%', height: 1, marginBottom: w * 0.07 }} />
@@ -48,7 +54,7 @@ export function BookCover({ book, w = 84, className = '' }) {
           <div className="absolute bottom-0 left-0 right-0" style={{ padding: `${w * 0.1}px ${w * 0.12}px ${w * 0.14}px ${w * 0.22}px` }}>
             <div className="font-serif leading-tight" style={{ fontSize: fs * 1.12 }}>{book.title}</div>
             <div className="bg-paper/60" style={{ width: '28%', height: 1, margin: `${w * 0.05}px 0` }} />
-            <div className="uppercase tracking-[.14em] opacity-80" style={{ fontSize: fs * 0.58 }}>{book.author}</div>
+            <div className="uppercase tracking-[.16em] opacity-80" style={{ fontSize: fs * 0.6 }}>{book.author}</div>
           </div>
         </>
       )}

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, NavLink, Route, Routes, useLocation, Link } from 'react-router-dom';
 import { useAuth } from './lib/auth';
 import { useAction } from './lib/ui';
+import { useFranchise } from './lib/franchise';
 import Login from './pages/Login';
 import Billing from './pages/Billing';
 import Bills from './pages/Bills';
@@ -56,6 +57,7 @@ function getSectionId(pathname) {
 
 function Shell({ pages }) {
   const { user, settings, logout, isOwner } = useAuth();
+  const { currentFranchise, franchises, selectFranchise } = useFranchise();
   const { pathname } = useLocation();
   const [signOut] = useAction(logout);
   const current = pages.find((p) => p.path === pathname);
@@ -77,11 +79,15 @@ function Shell({ pages }) {
               BK-OS
             </span>
             <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[#4F46E5]">
-              Automated
+              Multi-Franchise
             </span>
           </div>
           <div className="font-serif font-black text-[1.12rem] text-black leading-tight truncate">
             {settings.shopName}
+          </div>
+          <div className="text-[10px] font-mono font-bold text-[#15803D] mt-1 flex items-center gap-1 truncate bg-[#DCFCE7] px-1.5 py-0.5 border border-[#15803D]">
+            <span>🏢</span>
+            <span className="truncate">{currentFranchise.name}</span>
           </div>
         </NavLink>
 
@@ -128,7 +134,25 @@ function Shell({ pages }) {
               <span className="font-bold">?</span> Help for this page
             </Link>
           )}
+
+          {/* Franchise Selector Badge */}
+          <div className="hidden lg:flex items-center gap-1.5 bg-[#FAF9F5] border-2 border-black px-2 py-0.5 shadow-[2px_2px_0px_0px_#1A1A1A]">
+            <span className="text-xs" title="Franchise Storefront">🏢</span>
+            <select
+              aria-label="Active Franchise Store"
+              value={currentFranchise.id}
+              onChange={(e) => selectFranchise(e.target.value)}
+              className="bg-transparent text-xs font-mono font-bold text-black outline-none cursor-pointer border-none p-0 pr-1"
+            >
+              {franchises.map((f) => (
+                <option key={f.id} value={f.id} className="bg-white text-black font-sans">
+                  {f.name} ({f.code})
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
+
         <div className="flex items-center gap-3">
           <Link
             to="/help"
