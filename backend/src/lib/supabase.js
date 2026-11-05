@@ -66,3 +66,4 @@ module.exports = {
   supabase: client,
   syncBusinessToSupabase,
 };
+

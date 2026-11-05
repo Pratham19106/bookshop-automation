@@ -117,3 +117,4 @@ DO $$ BEGIN
   CREATE POLICY "Public read sessions" ON sessions FOR SELECT TO anon, authenticated USING (true);
   CREATE POLICY "Public delete sessions" ON sessions FOR DELETE TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+

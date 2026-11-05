@@ -76,3 +76,4 @@ test('duplicate username in registration is rejected', async () => {
   assert.equal(res.status, 409);
   assert.match(res.body.error.message, /already taken/i);
 });
+

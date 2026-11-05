@@ -61,3 +61,4 @@ UPDATE phone_orders SET business_id = 'biz_default' WHERE business_id IS NULL;
 UPDATE expenses SET business_id = 'biz_default' WHERE business_id IS NULL;
 UPDATE suppliers SET business_id = 'biz_default' WHERE business_id IS NULL;
 UPDATE purchase_orders SET business_id = 'biz_default' WHERE business_id IS NULL;
+
