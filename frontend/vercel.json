@@ -3,7 +3,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://RENDER-SERVICE-NAME.onrender.com/api/:path*"
+      "destination": "https://bookshop-automation-system-zmvv.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",
