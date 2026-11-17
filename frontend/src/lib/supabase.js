@@ -6,7 +6,7 @@ const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publish
 export const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
- * Multi-Franchise Default Stores (Ensures at least 2 franchises are always supportable)
+ * Multi-Franchise Default Stores
  */
 export const DEFAULT_FRANCHISES = [
   {
@@ -68,3 +68,61 @@ export async function getBooksCatalogue(genre = null) {
   return [];
 }
 
+/**
+ * Realtime Event Bus via Supabase Realtime & Window Broadcast
+ */
+let realtimeChannel = null;
+
+export function getRealtimeChannel() {
+  if (!realtimeChannel && supabase) {
+    try {
+      realtimeChannel = supabase.channel('bookshop-live-events', {
+        config: { broadcast: { self: true } },
+      }).subscribe();
+    } catch (e) {
+      console.warn('Supabase channel init warning:', e);
+    }
+  }
+  return realtimeChannel;
+}
+
+export function broadcastEvent(event, payload = {}) {
+  // 1. Dispatch local event across active application components
+  try {
+    window.dispatchEvent(new CustomEvent(`bookshop:${event}`, { detail: payload }));
+    window.dispatchEvent(new CustomEvent('bookshop:activity', { detail: { event, payload } }));
+  } catch {}
+
+  // 2. Broadcast across tabs and devices via Supabase Realtime
+  try {
+    const channel = getRealtimeChannel();
+    if (channel) {
+      channel.send({
+        type: 'broadcast',
+        event,
+        payload,
+      });
+    }
+  } catch (err) {
+    console.warn('Realtime broadcast warning:', err);
+  }
+}
+
+export function subscribeToActivity(callback) {
+  const handleLocal = (e) => callback(e.detail);
+  window.addEventListener('bookshop:activity', handleLocal);
+
+  let channel = null;
+  try {
+    channel = getRealtimeChannel();
+    if (channel) {
+      channel.on('broadcast', { event: '*' }, (data) => {
+        callback({ event: data.event, payload: data.payload });
+      });
+    }
+  } catch {}
+
+  return () => {
+    window.removeEventListener('bookshop:activity', handleLocal);
+  };
+}

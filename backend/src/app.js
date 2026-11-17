@@ -28,6 +28,24 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
   const app = express();
   app.disable('x-powered-by');
 
+  // CORS support for Vercel frontend or cross-origin environments
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-Requested-With, Authorization');
+    }
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(204);
+    }
+    next();
+  });
+
+  // Health check endpoint for Render, Railway, and monitoring
+  app.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
+
   app.use((req, res, next) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -39,6 +57,7 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
   app.use(express.static(config.publicDir));
 
   const api = express.Router();
+  api.get('/health', (req, res) => res.status(200).json({ status: 'ok', uptime: process.uptime() }));
   api.use((req, res, next) => {
     res.setHeader('Cache-Control', 'no-store');
     // CSRF defence in depth (cookie is also SameSite=Strict): state-changing calls must carry a custom header,
@@ -160,6 +179,8 @@ function createApp(db, { tzOffsetMinutes = config.tzOffsetMinutes } = {}) {
     }
   });
   api.post('/sales/:id/void', owner, (req, res) => ok(res, sales.voidSale(db, req.user, idParam(req), req.body)));
+  api.post('/sales/:id/refund', authed, (req, res) => ok(res, sales.refundItem(db, req.user, idParam(req), req.body)));
+  api.post('/sales/:id/exchange', authed, (req, res) => ok(res, sales.exchangeItem(db, req.user, idParam(req), req.body)));
 
   // ---- phone orders
   api.get('/orders', authed, (req, res) => ok(res, orders.listOrders(db, req.query)));

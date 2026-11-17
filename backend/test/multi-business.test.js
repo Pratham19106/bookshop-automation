@@ -74,14 +74,19 @@ test('POST /api/auth/register-business registers a business with multiple outlet
   assert.equal(me.body.user.franchises.length, 2);
 
   // Owner adds a 3rd shop with different address
+  // Owner adds a 3rd shop with different address and custom code
   const shop3 = await client.post('/api/franchises', {
     name: 'Crossword Pune Pavilion',
+    code: 'PUN-001',
     city: 'Pune',
     address: 'SB Road, Pune - 411 016',
     phone: '020-6600 4455'
   });
   assert.equal(shop3.status, 201);
   assert.equal(shop3.body.name, 'Crossword Pune Pavilion');
+  assert.equal(shop3.body.code, 'PUN-001');
+  assert.equal(shop3.body.address, 'SB Road, Pune - 411 016');
+  assert.equal(shop3.body.phone, '020-6600 4455');
 
   const fr = await client.get('/api/franchises');
   assert.equal(fr.status, 200);

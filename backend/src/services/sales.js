@@ -10,8 +10,10 @@ const METHODS = ['cash', 'card', 'upi', 'other'];
 
 function itemToApi(i, includeCost) {
   const out = {
+    id: i.id,
     bookId: i.book_id, title: i.title, author: i.author, isbn: i.isbn, edition: i.edition,
-    quantity: i.quantity, unitPriceCents: i.unit_price_cents, lineTotalCents: i.line_total_cents,
+    quantity: i.quantity, returnedQty: i.returned_qty || 0,
+    unitPriceCents: i.unit_price_cents, lineTotalCents: i.line_total_cents,
   };
   if (includeCost) out.unitCostCents = i.unit_cost_cents;
   return out;
@@ -20,6 +22,24 @@ function itemToApi(i, includeCost) {
 function saleToApi(db, user, row) {
   const items = db.prepare('SELECT * FROM sale_items WHERE sale_id = ? ORDER BY id').all(row.id);
   const cashier = db.prepare('SELECT full_name FROM users WHERE id = ?').get(row.user_id);
+  let returns = [];
+  try {
+    returns = db.prepare(`SELECT r.id, r.sale_id AS saleId, r.sale_item_id AS saleItemId,
+                                 r.book_id AS bookId, r.type, r.quantity, r.amount_cents AS amountCents,
+                                 r.replacement_book_id AS replacementBookId, r.reason,
+                                 r.created_at AS createdAt,
+                                 u.full_name AS processedBy,
+                                 b.title AS replacementTitle, b.isbn AS replacementIsbn
+                          FROM sale_returns r
+                          LEFT JOIN users u ON u.id = r.user_id
+                          LEFT JOIN books b ON b.id = r.replacement_book_id
+                          WHERE r.sale_id = ? ORDER BY r.id DESC`).all(row.id);
+  } catch {}
+
+  const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+  const saleAgeMs = Date.now() - new Date(row.created_at).getTime();
+  const isReturnEligible = saleAgeMs <= ONE_WEEK_MS && row.status !== 'voided';
+
   return {
     id: row.id, billNo: row.bill_no, status: row.status, customerName: row.customer_name,
     paymentMethod: row.payment_method,
@@ -27,7 +47,10 @@ function saleToApi(db, user, row) {
     taxPercent: row.tax_bp / 100, taxCents: row.tax_cents, totalCents: row.total_cents,
     orderId: row.order_id, cashier: cashier ? cashier.full_name : '',
     voidReason: row.void_reason, voidedAt: row.voided_at, createdAt: row.created_at,
+    isReturnEligible,
+    returnDaysRemaining: Math.max(0, Math.ceil((ONE_WEEK_MS - saleAgeMs) / (24 * 60 * 60 * 1000))),
     items: items.map((i) => itemToApi(i, user.role === 'owner')),
+    returns,
   };
 }
 
@@ -165,4 +188,149 @@ function voidSale(db, user, id, input) {
   });
 }
 
-module.exports = { createSale, getSale, getSaleByBillNo, listSales, voidSale, recordSale, METHODS };
+/**
+ * Refund an item on an existing sale within 1 week (7 days).
+ * Restores the returned quantity back to stock and creates a refund record.
+ */
+function refundItem(db, user, saleId, input) {
+  v.object(input);
+  const itemId = v.int(input.itemId, 'itemId', { min: 1 });
+  const qty = v.int(input.quantity || 1, 'quantity', { min: 1, max: 10000 });
+  const reason = v.str(input.reason || '', 'reason', { max: 300 });
+
+  return tx(db, () => {
+    const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId);
+    if (!sale) throw notFound('Bill');
+    if (sale.status === 'voided') throw conflict('Cannot refund a voided bill');
+
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const saleAgeMs = Date.now() - new Date(sale.created_at).getTime();
+    if (saleAgeMs > ONE_WEEK_MS) {
+      throw badRequest('Refund policy expired: refunds are only accepted within 1 week (7 days) of purchase');
+    }
+
+    const item = db.prepare('SELECT * FROM sale_items WHERE id = ? AND sale_id = ?').get(itemId, saleId);
+    if (!item) throw notFound('Sale item not found on this bill');
+
+    const returnedQty = item.returned_qty || 0;
+    const eligibleQty = item.quantity - returnedQty;
+    if (qty > eligibleQty) {
+      throw badRequest(`Cannot refund ${qty} copy/copies: only ${eligibleQty} eligible (already returned: ${returnedQty})`);
+    }
+
+    const netUnitCents = Math.round(item.unit_price_cents * (1 - (sale.discount_bp || 0) / 10000));
+    const refundAmountCents = netUnitCents * qty;
+
+    db.prepare('UPDATE sale_items SET returned_qty = returned_qty + ? WHERE id = ?').run(qty, itemId);
+
+    applyStock(db, {
+      bookId: item.book_id,
+      stockDelta: qty,
+      reason: 'refund',
+      refType: 'sale',
+      refId: saleId,
+      note: `Refund on ${sale.bill_no}: returned "${item.title}" x${qty} - ${reason || 'Customer refund'}`,
+      userId: user.id,
+    });
+
+    db.prepare(`INSERT INTO sale_returns(sale_id, sale_item_id, book_id, type, quantity, amount_cents, reason, user_id, business_id, franchise_id)
+                VALUES (?, ?, ?, 'refund', ?, ?, ?, ?, ?, ?)`).run(
+      saleId, itemId, item.book_id, qty, refundAmountCents, reason || 'Customer refund', user.id, sale.business_id || null, sale.franchise_id || null
+    );
+
+    return saleToApi(db, user, db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId));
+  });
+}
+
+/**
+ * Exchange an item on an existing sale within 1 week (7 days) for another book of the exact same price.
+ * Restores original book to stock and deducts replacement book from stock.
+ */
+function exchangeItem(db, user, saleId, input) {
+  v.object(input);
+  const itemId = v.int(input.itemId, 'itemId', { min: 1 });
+  const replacementBookId = v.int(input.replacementBookId, 'replacementBookId', { min: 1 });
+  const qty = v.int(input.quantity || 1, 'quantity', { min: 1, max: 10000 });
+  const reason = v.str(input.reason || '', 'reason', { max: 300 });
+
+  return tx(db, () => {
+    const sale = db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId);
+    if (!sale) throw notFound('Bill');
+    if (sale.status === 'voided') throw conflict('Cannot exchange on a voided bill');
+
+    const ONE_WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+    const saleAgeMs = Date.now() - new Date(sale.created_at).getTime();
+    if (saleAgeMs > ONE_WEEK_MS) {
+      throw badRequest('Exchange policy expired: exchanges are only accepted within 1 week (7 days) of purchase');
+    }
+
+    const item = db.prepare('SELECT * FROM sale_items WHERE id = ? AND sale_id = ?').get(itemId, saleId);
+    if (!item) throw notFound('Sale item not found on this bill');
+
+    const returnedQty = item.returned_qty || 0;
+    const eligibleQty = item.quantity - returnedQty;
+    if (qty > eligibleQty) {
+      throw badRequest(`Cannot exchange ${qty} copy/copies: only ${eligibleQty} eligible (already returned: ${returnedQty})`);
+    }
+
+    const repBook = db.prepare('SELECT * FROM books WHERE id = ?').get(replacementBookId);
+    if (!repBook) throw notFound('Replacement book');
+    if (!repBook.active) throw badRequest(`"${repBook.title}" is no longer active`);
+
+    // Strict same price constraint
+    if (repBook.price_cents !== item.unit_price_cents) {
+      const origFmt = (item.unit_price_cents / 100).toFixed(2);
+      const repFmt = (repBook.price_cents / 100).toFixed(2);
+      throw badRequest(`Exchange policy requires a replacement book of the exact same price (₹${origFmt}). "${repBook.title}" is priced at ₹${repFmt}.`);
+    }
+
+    // Available stock check
+    const available = repBook.stock_qty - repBook.reserved_qty;
+    if (available < qty) {
+      throw conflict(`Insufficient stock for "${repBook.title}": ${available} available, ${qty} needed`);
+    }
+
+    db.prepare('UPDATE sale_items SET returned_qty = returned_qty + ? WHERE id = ?').run(qty, itemId);
+
+    // Return original book to stock
+    applyStock(db, {
+      bookId: item.book_id,
+      stockDelta: qty,
+      reason: 'exchange',
+      refType: 'sale',
+      refId: saleId,
+      note: `Exchange on ${sale.bill_no}: returned "${item.title}" x${qty}`,
+      userId: user.id,
+    });
+
+    // Deduct replacement book from stock
+    applyStock(db, {
+      bookId: repBook.id,
+      stockDelta: -qty,
+      reason: 'exchange',
+      refType: 'sale',
+      refId: saleId,
+      note: `Exchange on ${sale.bill_no}: took "${repBook.title}" x${qty}`,
+      userId: user.id,
+    });
+
+    db.prepare(`INSERT INTO sale_returns(sale_id, sale_item_id, book_id, type, quantity, amount_cents, replacement_book_id, reason, user_id, business_id, franchise_id)
+                VALUES (?, ?, ?, 'exchange', ?, 0, ?, ?, ?, ?, ?)`).run(
+      saleId, itemId, item.book_id, qty, repBook.id, reason || 'Customer exchange (same price)', user.id, sale.business_id || null, sale.franchise_id || null
+    );
+
+    return saleToApi(db, user, db.prepare('SELECT * FROM sales WHERE id = ?').get(saleId));
+  });
+}
+
+module.exports = {
+  createSale,
+  getSale,
+  getSaleByBillNo,
+  listSales,
+  voidSale,
+  recordSale,
+  refundItem,
+  exchangeItem,
+  METHODS,
+};

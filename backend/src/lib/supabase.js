@@ -62,8 +62,32 @@ async function syncBusinessToSupabase({ business, outlets, user }) {
   }
 }
 
+/**
+ * Asynchronously syncs a single new franchise/outlet to Supabase
+ */
+async function syncFranchiseToSupabase(o) {
+  if (!client || !o) return;
+  try {
+    await client.from('franchises').upsert({
+      id: o.id,
+      business_id: o.business_id,
+      code: o.code,
+      name: o.name,
+      city: o.city || 'Hyderabad',
+      address: o.address || '',
+      phone: o.phone || '',
+      email: o.email || '',
+      status: o.status || 'active',
+      is_headquarters: !!o.is_headquarters,
+    });
+  } catch (err) {
+    console.warn('Franchise Supabase sync skipped:', err.message);
+  }
+}
+
 module.exports = {
   supabase: client,
   syncBusinessToSupabase,
+  syncFranchiseToSupabase,
 };
 

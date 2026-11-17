@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
+import { BookOpen, Building2, LogIn, HelpCircle, ArrowRight, Zap, Check, ChevronRight } from 'lucide-react';
 
 export default function Landing() {
   const { user } = useAuth();
@@ -105,44 +106,44 @@ export default function Landing() {
     : MODULES.filter((m) => m.category === activeCategory);
 
   return (
-    <div className="min-h-screen bg-[#FAF9F5] text-ink font-sans selection:bg-[#CCFF00] selection:text-black overflow-x-hidden">
+    <div className="min-h-screen bg-[#FAF9F5] text-ink font-sans selection:bg-[#CCFF00] selection:text-black overflow-x-hidden text-base">
       
       {/* Main Navbar */}
       <header className="sticky top-0 z-30 bg-white/95 backdrop-blur-md border-b-2 border-black shadow-sm">
         <div className="max-w-[1340px] mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
           <Link to="/" className="flex items-center gap-2.5 no-underline">
-            <span className="w-8 h-8 bg-[#1A1A1A] text-[#CCFF00] font-serif font-black text-lg border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#1A1A1A]">
-              B
+            <span className="w-9 h-9 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black flex items-center justify-center shadow-[2px_2px_0px_0px_#1A1A1A]">
+              <BookOpen className="w-5 h-5 text-[#CCFF00]" />
             </span>
-            <span className="font-serif font-black text-xl text-ink tracking-tight">
+            <span className="font-serif font-black text-2xl text-ink tracking-tight">
               Bookshop Automation System
             </span>
           </Link>
 
           {/* Navigation Shortcuts */}
-          <div className="flex items-center flex-wrap gap-2 text-[.82rem] font-bold">
-            <button onClick={() => scrollTo('overview')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">Overview</button>
-            <button onClick={() => scrollTo('features')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">7 Modules</button>
-            <button onClick={() => scrollTo('workflows')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">Workflows</button>
-            <button onClick={() => scrollTo('roles')} className="px-2.5 py-1 text-ink hover:bg-black hover:text-white transition-colors">Permissions</button>
-            <Link to="/help" className="px-3 py-1 bg-[#EEF2FF] text-[#4F46E5] border border-[#4F46E5] font-bold hover:bg-[#4F46E5] hover:text-white transition-all">
-              📖 Help Manual →
+          <div className="flex items-center flex-wrap gap-2.5 text-sm font-bold">
+            <button onClick={() => scrollTo('overview')} className="px-3 py-1.5 text-ink hover:bg-black hover:text-white transition-colors">Overview</button>
+            <button onClick={() => scrollTo('features')} className="px-3 py-1.5 text-ink hover:bg-black hover:text-white transition-colors">7 Modules</button>
+            <button onClick={() => scrollTo('workflows')} className="px-3 py-1.5 text-ink hover:bg-black hover:text-white transition-colors">Workflows</button>
+            <button onClick={() => scrollTo('roles')} className="px-3 py-1.5 text-ink hover:bg-black hover:text-white transition-colors">Permissions</button>
+            <Link to="/help" className="px-3 py-1.5 bg-[#EEF2FF] text-[#4F46E5] border border-[#4F46E5] font-bold hover:bg-[#4F46E5] hover:text-white transition-all flex items-center gap-1.5">
+              <BookOpen className="w-4 h-4 text-[#4F46E5]" /> Help Manual
             </Link>
             {user ? (
-              <Link to="/dashboard" className="px-3.5 py-1 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black font-mono font-bold hover:bg-[#CCFF00] hover:text-black transition-all ml-1 shadow-[2px_2px_0px_0px_#1A1A1A]">
+              <Link to="/dashboard" className="px-4 py-1.5 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black font-mono font-bold hover:bg-[#CCFF00] hover:text-black transition-all ml-1 shadow-[2px_2px_0px_0px_#1A1A1A]">
                 Launch Terminal ({user.username}) →
               </Link>
             ) : (
-              <div className="flex items-center gap-1.5 ml-1">
+              <div className="flex items-center gap-2 ml-1">
                 <Link
                   to="/login"
-                  className="px-3 py-1 bg-white hover:bg-black hover:text-white text-black border-2 border-black font-mono font-bold transition-all shadow-[2px_2px_0px_0px_#1A1A1A]"
+                  className="px-3.5 py-1.5 bg-white hover:bg-black hover:text-white text-black border-2 border-black font-mono font-bold transition-all shadow-[2px_2px_0px_0px_#1A1A1A] text-sm"
                 >
                   Log In
                 </Link>
                 <Link
                   to="/register"
-                  className="px-3.5 py-1 bg-[#CCFF00] hover:bg-black hover:text-[#CCFF00] text-black border-2 border-black font-mono font-bold transition-all shadow-[2px_2px_0px_0px_#1A1A1A]"
+                  className="px-4 py-1.5 bg-[#CCFF00] hover:bg-black hover:text-[#CCFF00] text-black border-2 border-black font-mono font-bold transition-all shadow-[2px_2px_0px_0px_#1A1A1A] text-sm"
                 >
                   Sign Up →
                 </Link>
@@ -153,8 +154,8 @@ export default function Landing() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative border-b-2 border-black bg-gradient-to-br from-[#FEFCE8] via-[#FAF9F5] to-[#EFF6FF] py-12 md:py-16 px-4">
-        <div className="max-w-[1340px] mx-auto grid lg:grid-cols-[1.2fr_0.8fr] gap-10 items-center">
+      <section className="relative border-b-2 border-black bg-gradient-to-br from-[#FEFCE8] via-[#FAF9F5] to-[#EFF6FF] py-14 md:py-20 px-4">
+        <div className="max-w-[1340px] mx-auto grid lg:grid-cols-[1.2fr_1fr] gap-10 items-center">
           
           {/* Left Hero */}
           <div className="animate-slide-up">
@@ -164,11 +165,14 @@ export default function Landing() {
               </span>
             </div>
 
-            <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl font-black leading-[1.08] mb-5 text-[#1A1A1A] tracking-tight border-0 pb-0">
-              The Architecture of a <span className="bg-gradient-to-r from-[#4F46E5] to-[#06B6D4] bg-clip-text text-transparent underline decoration-[#CCFF00] decoration-wavy decoration-2">Flawless Bookshop.</span>
+            <h1 className="font-serif text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black leading-[1.12] mb-6 text-[#1A1A1A] tracking-tight border-0 pb-0">
+              The Architecture of a <br className="hidden sm:inline" />
+              <span className="text-[#4F46E5] underline decoration-[#CCFF00] decoration-[6px] underline-offset-8">
+                Flawless Bookshop.
+              </span>
             </h1>
 
-            <p className="text-lg md:text-xl text-[#4B5563] leading-relaxed mb-6 max-w-2xl font-normal">
+            <p className="text-xl md:text-2xl text-[#4B5563] leading-relaxed mb-8 max-w-2xl font-normal">
               Purpose-engineered for physical independent bookshops and multi-outlet chains. 
               Eliminate phantom inventory, prevent accidental double-selling of phone orders, 
               compare competing supplier quotes instantly, and ring up atomic counter sales with 
@@ -176,22 +180,22 @@ export default function Landing() {
             </p>
 
             {/* CTA Buttons */}
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3.5">
               <Link
                 to="/register"
-                className="px-6 py-3.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                className="px-6 py-3.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-mono font-bold text-base border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center gap-2"
               >
-                Sign Up / Register Business →
+                Sign Up / Register Business <ArrowRight className="w-4 h-4" />
               </Link>
               <Link
                 to="/login"
-                className="px-6 py-3.5 bg-white hover:bg-black hover:text-[#CCFF00] text-black font-mono font-bold text-sm border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                className="px-6 py-3.5 bg-white hover:bg-black hover:text-[#CCFF00] text-black font-mono font-bold text-base border-2 border-black shadow-[4px_4px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
               >
                 Log In to Terminal →
               </Link>
               <button
                 onClick={() => scrollTo('features')}
-                className="px-4 py-3.5 bg-[#FAF9F5] text-black hover:bg-black hover:text-white font-mono font-bold text-sm border-2 border-black transition-all"
+                className="px-5 py-3.5 bg-[#FAF9F5] text-black hover:bg-black hover:text-white font-mono font-bold text-base border-2 border-black transition-all"
               >
                 Explore 7 Modules ↓
               </button>
@@ -202,30 +206,30 @@ export default function Landing() {
           <div className="animate-stamp">
             <div className="bg-white border-2 border-black p-6 sm:p-8 shadow-[8px_8px_0px_0px_#1A1A1A]">
               <div className="pb-4 mb-5 border-b-2 border-black">
-                <div className="text-[.72rem] uppercase tracking-wider font-mono font-bold text-[#4F46E5] mb-1">
+                <div className="text-xs uppercase tracking-wider font-mono font-bold text-[#4F46E5] mb-1">
                   Terminal Access Portal
                 </div>
                 <h2 className="!mb-0 text-2xl sm:text-3xl font-serif font-black text-black">
                   Welcome to System
                 </h2>
-                <p className="text-xs sm:text-sm text-[#4B5563] mt-1.5 font-normal">
+                <p className="text-sm sm:text-base text-[#4B5563] mt-1.5 font-normal">
                   Access your counter point-of-sale, oversee inventory, or onboard a new bookshop organization.
                 </p>
               </div>
 
               {user ? (
                 <div className="py-2 text-center space-y-4">
-                  <div className="p-4 bg-[#EEF2FF] border-2 border-[#4338CA] text-[#312E81] text-sm">
+                  <div className="p-4 bg-[#EEF2FF] border-2 border-[#4338CA] text-[#312E81] text-base">
                     Authenticated session active for <strong>{user.fullName}</strong> ({user.role})
                     {user.business?.name && (
-                      <div className="text-xs text-[#4F46E5] mt-1.5 font-mono font-bold">
-                        🏢 {user.business.name}
+                      <div className="text-sm text-[#4F46E5] mt-1.5 font-mono font-bold flex items-center justify-center gap-1.5">
+                        <Building2 className="w-4 h-4" /> {user.business.name}
                       </div>
                     )}
                   </div>
                   <Link
                     to={user.role === 'owner' ? '/dashboard' : '/billing'}
-                    className="block w-full py-3.5 bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold text-center border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:bg-[#CCFF00] hover:text-black transition-all"
+                    className="block w-full py-4 bg-[#1A1A1A] text-[#CCFF00] font-mono font-bold text-base text-center border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:bg-[#CCFF00] hover:text-black transition-all"
                   >
                     Open Terminal Workspace ({user.role === 'owner' ? 'Dashboard' : 'POS Billing'}) →
                   </Link>
@@ -235,46 +239,22 @@ export default function Landing() {
                   <div className="space-y-3">
                     <Link
                       to="/login"
-                      className="block w-full py-3.5 px-4 bg-[#1A1A1A] hover:bg-[#CCFF00] text-[#CCFF00] hover:text-black font-mono font-bold text-sm text-center border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                      className="block w-full py-3.5 px-4 bg-[#1A1A1A] hover:bg-[#CCFF00] text-[#CCFF00] hover:text-black font-mono font-bold text-base text-center border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2"
                     >
-                      🔑 Log In to Existing Account →
+                      <LogIn className="w-5 h-5 text-[#CCFF00]" /> Log In to Existing Account →
                     </Link>
 
                     <Link
                       to="/register"
-                      className="block w-full py-3.5 px-4 bg-[#FAF5FF] hover:bg-[#9333EA] text-[#6B21A8] hover:text-white font-mono font-bold text-sm text-center border-2 border-black shadow-[4px_4px_0px_0px_#9333EA] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+                      className="block w-full py-3.5 px-4 bg-[#FAF5FF] hover:bg-[#9333EA] text-[#6B21A8] hover:text-white font-mono font-bold text-base text-center border-2 border-black shadow-[4px_4px_0px_0px_#9333EA] hover:shadow-[2px_2px_0px_0px_#1A1A1A] hover:translate-x-[2px] hover:translate-y-[2px] transition-all flex items-center justify-center gap-2"
                     >
-                      🏢 Sign Up / Register New Bookshop →
+                      <Building2 className="w-5 h-5 text-[#6B21A8]" /> Sign Up / Register New Bookshop →
                     </Link>
                   </div>
 
-                  <div className="pt-4 border-t-2 border-black space-y-2.5">
-                    <div className="text-[.7rem] uppercase font-mono font-bold text-[#6B7280]">
-                      Platform Architecture:
-                    </div>
-                    <div className="space-y-1.5 text-xs text-[#374151] font-medium">
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#15803D] font-bold">✓</span>
-                        <span>Multi-store franchise support with individual addresses</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#15803D] font-bold">✓</span>
-                        <span>Real-time catalogue with physical shelf coordinates</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#15803D] font-bold">✓</span>
-                        <span>Atomic counter checkout with zero negative stock</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[#15803D] font-bold">✓</span>
-                        <span>Automated vendor price comparison & velocity restocking</span>
-                      </div>
-                    </div>
-                  </div>
-
                   <div className="pt-2 text-center">
-                    <Link to="/help" className="text-xs font-mono font-bold text-[#4F46E5] hover:underline">
-                      📖 View Help & System Manual →
+                    <Link to="/help" className="text-sm font-mono font-bold text-[#4F46E5] hover:underline flex items-center justify-center gap-1.5">
+                      <BookOpen className="w-4 h-4 text-[#4F46E5]" /> View Help & System Manual →
                     </Link>
                   </div>
                 </div>
@@ -285,35 +265,35 @@ export default function Landing() {
       </section>
 
       {/* Rolling Banner */}
-      <div className="bg-[#CCFF00] text-black py-2.5 border-b-2 border-black overflow-hidden relative">
-        <div className="marquee-track flex text-[.82rem] font-mono tracking-wider uppercase font-black">
+      <div className="bg-[#CCFF00] text-black py-3 border-b-2 border-black overflow-hidden relative">
+        <div className="marquee-track flex text-sm font-mono tracking-wider uppercase font-black">
           <div className="marquee-content-reverse flex items-center gap-6 pr-6">
-            <span>⚡ PHYSICAL LOCATION MAPPING (AISLE/RACK/SHELF)</span>
-            <span className="text-black/30">★</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-4 h-4" /> PHYSICAL LOCATION MAPPING (AISLE/RACK/SHELF)</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>RESTOCKING VELOCITY INTELLIGENCE</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>CHEAPEST SUPPLIER QUOTES AUTOMATICALLY RANKED</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>TELEPHONE RESERVATION EXPIRY GUARDS</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>IMMUTABLE STOCK MOVEMENTS AUDIT TRAIL</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>P&L WITH TRUE HISTORICAL COGS SNAPSHOT</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
           </div>
           <div className="marquee-content-reverse flex items-center gap-6 pr-6" aria-hidden="true">
-            <span>⚡ PHYSICAL LOCATION MAPPING (AISLE/RACK/SHELF)</span>
-            <span className="text-black/30">★</span>
+            <span className="flex items-center gap-1.5"><Zap className="w-4 h-4" /> PHYSICAL LOCATION MAPPING (AISLE/RACK/SHELF)</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>RESTOCKING VELOCITY INTELLIGENCE</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>CHEAPEST SUPPLIER QUOTES AUTOMATICALLY RANKED</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>TELEPHONE RESERVATION EXPIRY GUARDS</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>IMMUTABLE STOCK MOVEMENTS AUDIT TRAIL</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
             <span>P&L WITH TRUE HISTORICAL COGS SNAPSHOT</span>
-            <span className="text-black/30">★</span>
+            <span className="text-black/40 font-bold">•</span>
           </div>
         </div>
       </div>
@@ -327,7 +307,7 @@ export default function Landing() {
           <h2 className="text-3xl md:text-4xl font-serif font-black text-black mb-3">
             Built for Physical Books, Not Virtual Pixels.
           </h2>
-          <p className="text-base md:text-lg text-[#4B5563]">
+          <p className="text-lg text-[#4B5563]">
             SaaS platforms treat products as abstract line items. A real bookshop deals in physical editions, 
             warehouse aisles, phone reserves, and wholesale distributor margins.
           </p>
@@ -339,7 +319,7 @@ export default function Landing() {
               01
             </div>
             <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Aisle, Rack & Shelf Indexing</h3>
-            <p className="text-[.9rem] text-[#4B5563] leading-relaxed">
+            <p className="text-base text-[#4B5563] leading-relaxed">
               Every edition in your catalogue is tagged with its real physical coordinates (e.g. <code>Aisle 2, Rack B, Shelf 4</code>). 
               Counter staff locate books for customers in seconds instead of hunting blindly.
             </p>
@@ -350,7 +330,7 @@ export default function Landing() {
               02
             </div>
             <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Immediate Atomic Checkout</h3>
-            <p className="text-[.9rem] text-[#4B5563] leading-relaxed">
+            <p className="text-base text-[#4B5563] leading-relaxed">
               Counter sales run in a single transaction. If power cuts or stock validation fails, 
               the bill, line items, and stock deductions roll back atomically without ghost invoices.
             </p>
@@ -361,7 +341,7 @@ export default function Landing() {
               03
             </div>
             <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Reserved Stock Protection</h3>
-            <p className="text-[.9rem] text-[#4B5563] leading-relaxed">
+            <p className="text-base text-[#4B5563] leading-relaxed">
               When a customer calls to reserve a book, stock is placed into <code>reserved</code> status immediately. 
               The counter POS will refuse to sell that copy to a walk-in, eliminating customer apologies.
             </p>
@@ -382,12 +362,12 @@ export default function Landing() {
           </div>
 
           {/* Category Filter Buttons */}
-          <div className="flex flex-wrap gap-1.5 font-mono text-xs font-bold">
+          <div className="flex flex-wrap gap-2 font-mono text-sm font-bold">
             {['all', 'sales', 'stock', 'intelligence'].map((cat) => (
               <button
                 key={cat}
                 onClick={() => setActiveCategory(cat)}
-                className={`px-3 py-1.5 uppercase border-2 border-black transition-all ${
+                className={`px-3.5 py-1.5 uppercase border-2 border-black transition-all ${
                   activeCategory === cat
                     ? 'bg-black text-[#CCFF00] shadow-[2px_2px_0px_0px_#4F46E5]'
                     : 'bg-white text-black hover:bg-[#FAF5FF]'
@@ -408,25 +388,25 @@ export default function Landing() {
             >
               <div>
                 <div className="flex items-center justify-between mb-3">
-                  <span className={`font-mono text-xs font-black px-2 py-0.5 border border-black ${m.badgeColor}`}>
+                  <span className={`font-mono text-xs font-black px-2.5 py-1 border border-black ${m.badgeColor}`}>
                     MODULE {m.num}
                   </span>
-                  <span className="font-mono text-xs font-bold text-muted bg-[#F3F4F6] px-2 py-0.5 border border-hair">
+                  <span className="font-mono text-xs font-bold text-muted bg-[#F3F4F6] px-2.5 py-1 border border-hair">
                     {m.tag}
                   </span>
                 </div>
 
-                <div className="text-[.72rem] uppercase font-mono font-bold text-navy mb-1">{m.tag}</div>
+                <div className="text-xs uppercase font-mono font-bold text-navy mb-1">{m.tag}</div>
                 <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">{m.title}</h3>
-                <p className="text-[.88rem] text-[#4B5563] leading-relaxed mb-4">{m.summary}</p>
+                <p className="text-base text-[#4B5563] leading-relaxed mb-4">{m.summary}</p>
               </div>
 
               <div className="pt-3 border-t-2 border-black flex items-center justify-between">
                 <Link
                   to={m.path}
-                  className="font-mono text-xs font-black text-black hover:text-[#4F46E5] flex items-center gap-1 group"
+                  className="font-mono text-sm font-black text-black hover:text-[#4F46E5] flex items-center gap-1.5 group"
                 >
-                  Inspect Rules & Guide <span className="group-hover:translate-x-1 transition-transform">→</span>
+                  Inspect Rules & Guide <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
                 </Link>
                 <span className="w-2.5 h-2.5 bg-black"></span>
               </div>
@@ -434,7 +414,7 @@ export default function Landing() {
           ))}
         </div>
 
-        <div className="mt-4 flex items-center justify-between text-xs font-mono text-muted">
+        <div className="mt-4 flex items-center justify-between text-sm font-mono text-muted">
           <span>← Swipe or scroll horizontally to explore all modules</span>
           <Link to="/help" className="text-black font-bold underline hover:text-[#4F46E5]">
             Open Full Functional Index in Help Manual →
@@ -451,7 +431,7 @@ export default function Landing() {
           <h2 className="text-3xl md:text-4xl font-serif font-black text-black mb-3">
             A Day in the Life with the System
           </h2>
-          <p className="text-base text-[#4B5563]">
+          <p className="text-lg text-[#4B5563]">
             Follow standardized routines designed for maximum counter speed and inventory precision.
           </p>
         </div>
@@ -459,60 +439,60 @@ export default function Landing() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <div className="p-5 bg-white border-2 border-black shadow-[4px_4px_0px_0px_#4F46E5] flex flex-col justify-between">
             <div>
-              <div className="w-8 h-8 bg-[#4F46E5] text-white font-mono font-black flex items-center justify-center mb-3">
+              <div className="w-9 h-9 bg-[#4F46E5] text-white font-mono font-black flex items-center justify-center mb-3 text-base">
                 1
               </div>
-              <h3 className="!mt-0 !mb-2 text-lg font-serif font-bold text-black">Morning Review</h3>
-              <p className="text-[.85rem] text-[#4B5563] leading-relaxed mb-3">
+              <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Morning Review</h3>
+              <p className="text-base text-[#4B5563] leading-relaxed mb-3">
                 Open Restocking to check Critical alert titles. Review computed sales velocity and dispatch POs to the cheapest vendor with 1 click.
               </p>
             </div>
-            <div className="pt-2 border-t border-hair font-mono text-[.75rem] text-navy font-bold">
+            <div className="pt-2 border-t border-hair font-mono text-xs text-navy font-bold">
               Route: #/restock
             </div>
           </div>
 
           <div className="p-5 bg-white border-2 border-black shadow-[4px_4px_0px_0px_#059669] flex flex-col justify-between">
             <div>
-              <div className="w-8 h-8 bg-[#059669] text-white font-mono font-black flex items-center justify-center mb-3">
+              <div className="w-9 h-9 bg-[#059669] text-white font-mono font-black flex items-center justify-center mb-3 text-base">
                 2
               </div>
-              <h3 className="!mt-0 !mb-2 text-lg font-serif font-bold text-black">Counter Checkout</h3>
-              <p className="text-[.85rem] text-[#4B5563] leading-relaxed mb-3">
+              <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Counter Checkout</h3>
+              <p className="text-base text-[#4B5563] leading-relaxed mb-3">
                 Scan barcode or type ISBN. Staff discount caps prevent unauthorized loss. Finalize bill on Enter and hand customer thermal slip.
               </p>
             </div>
-            <div className="pt-2 border-t border-hair font-mono text-[.75rem] text-olive font-bold">
+            <div className="pt-2 border-t border-hair font-mono text-xs text-olive font-bold">
               Route: #/billing
             </div>
           </div>
 
           <div className="p-5 bg-white border-2 border-black shadow-[4px_4px_0px_0px_#D97706] flex flex-col justify-between">
             <div>
-              <div className="w-8 h-8 bg-[#D97706] text-white font-mono font-black flex items-center justify-center mb-3">
+              <div className="w-9 h-9 bg-[#D97706] text-white font-mono font-black flex items-center justify-center mb-3 text-base">
                 3
               </div>
-              <h3 className="!mt-0 !mb-2 text-lg font-serif font-bold text-black">Receive Deliveries</h3>
-              <p className="text-[.85rem] text-[#4B5563] leading-relaxed mb-3">
+              <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Receive Deliveries</h3>
+              <p className="text-base text-[#4B5563] leading-relaxed mb-3">
                 Check-in distributor boxes in Purchases. Partial deliveries accepted; inventory unit cost dynamically recalibrates for true P&L.
               </p>
             </div>
-            <div className="pt-2 border-t border-hair font-mono text-[.75rem] text-ochre font-bold">
+            <div className="pt-2 border-t border-hair font-mono text-xs text-ochre font-bold">
               Route: #/purchases
             </div>
           </div>
 
           <div className="p-5 bg-white border-2 border-black shadow-[4px_4px_0px_0px_#BE123C] flex flex-col justify-between">
             <div>
-              <div className="w-8 h-8 bg-[#BE123C] text-white font-mono font-black flex items-center justify-center mb-3">
+              <div className="w-9 h-9 bg-[#BE123C] text-white font-mono font-black flex items-center justify-center mb-3 text-base">
                 4
               </div>
-              <h3 className="!mt-0 !mb-2 text-lg font-serif font-bold text-black">Closing Operations</h3>
-              <p className="text-[.85rem] text-[#4B5563] leading-relaxed mb-3">
+              <h3 className="!mt-0 !mb-2 text-xl font-serif font-bold text-black">Closing Operations</h3>
+              <p className="text-base text-[#4B5563] leading-relaxed mb-3">
                 Review Dashboard for Net Sales and Gross Profit. Log daily overheads in Expenses. Keep historical audits pristine.
               </p>
             </div>
-            <div className="pt-2 border-t border-hair font-mono text-[.75rem] text-brick font-bold">
+            <div className="pt-2 border-t border-hair font-mono text-xs text-brick font-bold">
               Route: #/dashboard
             </div>
           </div>
@@ -535,42 +515,42 @@ export default function Landing() {
           <table className="ledger">
             <thead>
               <tr className="bg-[#F8FAFC]">
-                <th className="py-2.5 px-3">System Action</th>
-                <th className="w-[140px] py-2.5 px-3">Staff Role</th>
-                <th className="w-[140px] py-2.5 px-3">Owner Role</th>
-                <th className="py-2.5 px-3">Enforcement Safeguard</th>
+                <th className="py-3 px-3.5">System Action</th>
+                <th className="w-[140px] py-3 px-3.5">Staff Role</th>
+                <th className="w-[140px] py-3 px-3.5">Owner Role</th>
+                <th className="py-3 px-3.5">Enforcement Safeguard</th>
               </tr>
             </thead>
             <tbody>
               <tr>
-                <td className="py-2.5 px-3"><strong>Counter Billing & Sales</strong></td>
-                <td><span className="px-2 py-0.5 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Active</span></td>
-                <td><span className="px-2 py-0.5 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Active</span></td>
-                <td className="text-muted text-xs">Staff discount is capped by shop setting. Higher discounts refused by server.</td>
+                <td className="py-3 px-3.5"><strong>Counter Billing & Sales</strong></td>
+                <td><span className="px-2.5 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Active</span></td>
+                <td><span className="px-2.5 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Active</span></td>
+                <td className="text-muted text-sm">Staff discount is capped by shop setting. Higher discounts refused by server.</td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3"><strong>Void Invoices</strong></td>
-                <td><span className="px-2 py-0.5 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Refused (403)</span></td>
-                <td><span className="px-2 py-0.5 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Authorized</span></td>
-                <td className="text-muted text-xs">Voiding restores physical inventory and removes transaction from sales reports.</td>
+                <td className="py-3 px-3.5"><strong>Void Invoices</strong></td>
+                <td><span className="px-2.5 py-1 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Refused (403)</span></td>
+                <td><span className="px-2.5 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Authorized</span></td>
+                <td className="text-muted text-sm">Voiding restores physical inventory and removes transaction from sales reports.</td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3"><strong>Wholesale Supplier Cost Data</strong></td>
-                <td><span className="px-2 py-0.5 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Hidden (403)</span></td>
-                <td><span className="px-2 py-0.5 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Full Access</span></td>
-                <td className="text-muted text-xs">Supplier wholesale prices and margin data are stripped from staff catalogue responses.</td>
+                <td className="py-3 px-3.5"><strong>Wholesale Supplier Cost Data</strong></td>
+                <td><span className="px-2.5 py-1 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Hidden (403)</span></td>
+                <td><span className="px-2.5 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Full Access</span></td>
+                <td className="text-muted text-sm">Supplier wholesale prices and margin data are stripped from staff catalogue responses.</td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3"><strong>Physical Stock Audit Adjustments</strong></td>
-                <td><span className="px-2 py-0.5 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Refused (403)</span></td>
-                <td><span className="px-2 py-0.5 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Authorized</span></td>
-                <td className="text-muted text-xs">Requires counted quantity and mandatory audit reason written to movement log.</td>
+                <td className="py-3 px-3.5"><strong>Physical Stock Audit Adjustments</strong></td>
+                <td><span className="px-2.5 py-1 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Refused (403)</span></td>
+                <td><span className="px-2.5 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Authorized</span></td>
+                <td className="text-muted text-sm">Requires counted quantity and mandatory audit reason written to movement log.</td>
               </tr>
               <tr>
-                <td className="py-2.5 px-3"><strong>Financial P&L Dashboard</strong></td>
-                <td><span className="px-2 py-0.5 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Refused (403)</span></td>
-                <td><span className="px-2 py-0.5 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Full Analytics</span></td>
-                <td className="text-muted text-xs">Cost of goods sold, gross margin, and operating profit reports are owner-only.</td>
+                <td className="py-3 px-3.5"><strong>Financial P&L Dashboard</strong></td>
+                <td><span className="px-2.5 py-1 bg-[#FEE2E2] text-[#B91C1C] font-mono text-xs font-bold border border-[#B91C1C]">Refused (403)</span></td>
+                <td><span className="px-2.5 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border border-[#15803D]">Full Analytics</span></td>
+                <td className="text-muted text-sm">Cost of goods sold, gross margin, and operating profit reports are owner-only.</td>
               </tr>
             </tbody>
           </table>
@@ -583,9 +563,9 @@ export default function Landing() {
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="w-3 h-3 bg-[#CCFF00]"></span>
-              <span className="font-serif font-black text-xl text-white">Bookshop Automation System</span>
+              <span className="font-serif font-black text-2xl text-white">Bookshop Automation System</span>
             </div>
-            <div className="font-mono text-xs text-white/60">
+            <div className="font-mono text-sm text-white/60">
               Multi-Store Retail & Franchise Architecture
             </div>
           </div>
@@ -593,15 +573,15 @@ export default function Landing() {
           <div className="flex items-center gap-3">
             <button
               onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white hover:text-black text-white font-mono text-xs font-bold border border-white/30 transition-colors"
+              className="px-4 py-2 bg-white/10 hover:bg-white hover:text-black text-white font-mono text-sm font-bold border border-white/30 transition-colors"
             >
               ↑ Top of Page
             </button>
             <Link
               to="/help"
-              className="px-4 py-1.5 bg-[#CCFF00] text-black font-mono text-xs font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_0px_#4F46E5] hover:bg-white transition-all"
+              className="px-5 py-2 bg-[#CCFF00] text-black font-mono text-sm font-black uppercase tracking-wider border-2 border-black shadow-[3px_3px_0px_0px_#4F46E5] hover:bg-white transition-all flex items-center gap-2"
             >
-              Open System Help Guide →
+              <BookOpen className="w-4 h-4 text-black" /> Open System Help Guide →
             </Link>
           </div>
         </div>

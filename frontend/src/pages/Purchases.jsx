@@ -6,6 +6,7 @@ import { bookName, fmt, fmtDate, fmtDateTime, money, parseMoney, uuid } from '..
 import { useLoad } from '../lib/hooks';
 import { confirmBox, toast } from '../lib/overlays';
 import { Actions, Async, Badge, BookPicker, Button, Empty, Field, Modal, PageTitle, Tabs, useAction } from '../lib/ui';
+import { Check } from 'lucide-react';
 
 // New purchase order. `prefill` = { supplierId, items: [{ bookId, title, quantity }] } when coming from restocking.
 function PoForm({ prefill, onClose, onSaved }) {
@@ -106,7 +107,7 @@ function PoDetail({ id, onClose, onChange }) {
             <td className="num">{fmt(i.unitCostCents)}</td><td className="num">{i.qtyOrdered}</td><td className="num">{i.qtyReceived}</td>
             {canReceive && <td>{i.qtyOutstanding > 0
               ? <><input type="number" min="0" max={i.qtyOutstanding} className="input !w-16 font-mono" value={qty[i.id] ?? ''} onChange={(e) => setQty((s) => ({ ...s, [i.id]: e.target.value }))} /> <span className="text-muted text-[.8rem]">of {i.qtyOutstanding}</span></>
-              : '✓'}</td>}
+              : <Check className="w-4 h-4 text-emerald-600 inline" />}</td>}
           </tr>))}
         </tbody>
       </table></div>

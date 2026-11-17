@@ -6,6 +6,7 @@ import { bookName, fmt } from '../lib/format';
 import { useLoad } from '../lib/hooks';
 import { toast } from '../lib/overlays';
 import { Async, Badge, Empty, PageTitle } from '../lib/ui';
+import { AlertTriangle } from 'lucide-react';
 
 export default function Restock() {
   const { settings } = useAuth();
@@ -63,7 +64,7 @@ export default function Restock() {
                         <div className="text-muted text-[.8rem]">{r.location}</div></td>
                       <td>
                         <ul className="list-disc pl-4">{r.reasons.map((x) => <li key={x}>{x}</li>)}</ul>
-                        {r.caveats.map((c) => <div key={c} className="text-ochre text-[.82rem]">⚠ {c}</div>)}
+                        {r.caveats.map((c) => <div key={c} className="text-ochre text-xs flex items-center gap-1 mt-0.5"><AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /><span>{c}</span></div>)}
                         <div className="text-muted text-[.8rem] font-mono flex flex-wrap gap-x-3.5 mt-0.5">
                           <span>Sold <b className="text-ink">{r.metrics.unitsSold}</b> in {r.metrics.observedDays}d (<b className="text-ink">{r.metrics.velocityPerDay}</b>/day)</span>
                           <span>Available <b className="text-ink">{r.metrics.availableQty}</b>{r.metrics.reservedQty ? ` (+${r.metrics.reservedQty} reserved)` : ''}</span>

@@ -255,10 +255,12 @@ function createFranchise(db, user, input) {
   const businessId = user.business_id || 'biz_default';
 
   const count = db.prepare('SELECT COUNT(*) c FROM franchises WHERE business_id = ?').get(businessId).c;
-  const franchiseId = `${businessId}_fr_${count + 1}`;
-  const code = `FR-${String(count + 1).padStart(3, '0')}`;
+  const franchiseId = `${businessId}_fr_${count + 1}_${Date.now().toString(36)}`;
+  const code = input.code && String(input.code).trim()
+    ? String(input.code).trim().toUpperCase()
+    : `FR-${String(count + 1).padStart(3, '0')}`;
 
-  return tx(db, () => {
+  const res = tx(db, () => {
     if (isHq) {
       db.prepare('UPDATE franchises SET is_headquarters = 0 WHERE business_id = ?').run(businessId);
     }
@@ -267,6 +269,13 @@ function createFranchise(db, user, input) {
       .run(franchiseId, businessId, code, name, city, address, phone, email, isHq ? 1 : (count === 0 ? 1 : 0));
     return db.prepare('SELECT * FROM franchises WHERE id = ?').get(franchiseId);
   });
+
+  try {
+    const { syncFranchiseToSupabase } = require('../lib/supabase');
+    if (syncFranchiseToSupabase) syncFranchiseToSupabase(res);
+  } catch (e) {}
+
+  return res;
 }
 
 module.exports = {

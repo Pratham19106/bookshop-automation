@@ -6,11 +6,14 @@ export class ApiError extends Error {
   }
 }
 
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+
 export async function api(method, path, body) {
   let res;
   try {
-    res = await fetch(`/api${path}`, {
+    res = await fetch(`${API_BASE}/api${path}`, {
       method,
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'bookshop' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });

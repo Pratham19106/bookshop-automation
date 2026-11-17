@@ -7,6 +7,8 @@ import { fmt, uuid } from '../lib/format';
 import { confirmBox, fail, toast } from '../lib/overlays';
 import { Actions, BookPicker, Button, Field, Modal, PageTitle } from '../lib/ui';
 import PhysicalCashMemo from '../components/PhysicalCashMemo';
+import { FolderArchive, CheckCircle2 } from 'lucide-react';
+import { broadcastEvent } from '../lib/supabase';
 
 const STORAGE_KEY_ACTIVE = 'bookshop_active_bill';
 const STORAGE_KEY_DRAFTS = 'bookshop_bill_drafts';
@@ -207,6 +209,7 @@ export default function Billing() {
       setLastBill(sale);
       setFinalizedSale(sale);
       reset();
+      broadcastEvent('sale', { saleId: sale.id, billNo: sale.billNo, totalCents: sale.totalCents });
       toast(`Sale ${sale.billNo} saved`);
     } catch (e) {
       fail(e);
@@ -231,7 +234,8 @@ export default function Billing() {
                 }`}
                 onClick={() => setShowDraftsList(!showDraftsList)}
               >
-                <span>📁 Parked Drafts ({drafts.length})</span>
+                <FolderArchive className="w-4 h-4" />
+                <span>Parked Drafts ({drafts.length})</span>
                 <span>{showDraftsList ? '▲' : '▼'}</span>
               </button>
             )}
@@ -340,7 +344,10 @@ export default function Billing() {
                 className="btn btn-sm bg-[#FEF3C7] text-black border-black text-xs font-bold"
                 onClick={() => setShowDraftsList(true)}
               >
-                📁 {drafts.length} Parked {drafts.length === 1 ? 'Draft' : 'Drafts'}
+                <span className="flex items-center gap-1.5">
+                  <FolderArchive className="w-4 h-4" />
+                  <span>{drafts.length} Parked {drafts.length === 1 ? 'Draft' : 'Drafts'}</span>
+                </span>
               </button>
             )}
           </div>
@@ -541,7 +548,7 @@ export default function Billing() {
           <div className="space-y-3">
             <div className="p-2.5 bg-emerald-50 border border-emerald-300 text-emerald-900 text-xs font-semibold flex items-center justify-between rounded">
               <span className="flex items-center gap-1.5">
-                <span className="text-emerald-700 font-bold">✓</span>
+                <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
                 <span>Sale <strong>{finalizedSale.billNo}</strong> saved successfully. Inventory updated.</span>
               </span>
               <span className="font-mono">{finalizedSale.items?.length || 0} items · {fmt(finalizedSale.totalCents)}</span>

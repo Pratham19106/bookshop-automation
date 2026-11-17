@@ -17,7 +17,7 @@ const HELP_SECTIONS = [
       'Optionally specify a customer name and phone number for purchase records.',
       'Apply a bill discount percentage if needed. Staff accounts are restricted to the shop discount limit configured in Settings.',
       'Hold / Save Draft: If a customer needs to fetch more books or look for cash, click "Hold / Save Draft" to park their cart into the draft queue and immediately free the register for another customer.',
-      'Resume Parked Draft: Click "📁 Parked Drafts" at the top of the bill section to view all held tickets. Click "Resume Draft" to restore any parked customer bill back into the register.',
+      'Resume Parked Draft: Click "Parked Drafts" at the top of the bill section to view all held tickets. Click "Resume Draft" to restore any parked customer bill back into the register.',
       'Review the itemized totals, tax (calculated on discounted subtotal), and final grand total.',
       'Click "Finalize Bill (Enter)" to commit the sale. The transaction runs atomically in the database and immediately prints or opens the receipt.'
     ],

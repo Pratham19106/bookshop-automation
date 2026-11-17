@@ -5,6 +5,7 @@ import { fmt } from '../lib/format';
 import { useLoad } from '../lib/hooks';
 import { confirmBox, fail, toast } from '../lib/overlays';
 import { Actions, BookPicker, Button, Empty, Field, Modal, PageTitle, useAction } from '../lib/ui';
+import { Wand2, MapPin, BookOpen, Zap } from 'lucide-react';
 
 const DEFAULT_SHELVES = ['Shelf 4 (Top)', 'Shelf 3', 'Shelf 2', 'Shelf 1 (Bottom)'];
 
@@ -95,8 +96,8 @@ export default function Shelves() {
             <span className="bg-[#EEF2FF] text-[#4F46E5] font-mono text-xs font-bold px-2.5 py-1 border border-[#4F46E5] shadow-[2px_2px_0px_0px_#4F46E5] hidden sm:inline-block">
               Physical Coordinates
             </span>
-            <button className="btn btn-sm" onClick={() => setShowWizard(true)}>
-              🪄 Layout Wizard
+            <button className="btn btn-sm flex items-center gap-1.5" onClick={() => setShowWizard(true)}>
+              <Wand2 className="w-3.5 h-3.5" /> Layout Wizard
             </button>
             <button className="btn btn-sm" onClick={() => booksState.reload()}>
               ↻ Refresh
@@ -153,7 +154,7 @@ export default function Shelves() {
                 return (
                   <div key={aisleName} className="p-2 border border-hair bg-paper">
                     <div className="flex justify-between items-center mb-1.5 text-xs font-bold font-serif text-ink">
-                      <span>📍 {aisleName}</span>
+                      <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-[#4F46E5]" /> {aisleName}</span>
                       <span className="text-[.75rem] font-mono text-muted">{racks.length} rack{racks.length === 1 ? '' : 's'}</span>
                     </div>
 
@@ -238,7 +239,7 @@ export default function Shelves() {
                 >
                   <div className="flex justify-between items-center text-xs">
                     <span className="font-bold font-serif flex items-center gap-1.5">
-                      <span>📖</span> {shelfLabel}
+                      <BookOpen className="w-3.5 h-3.5 text-[#4F46E5]" /> {shelfLabel}
                       {isTarget && <span className="badge badge-ok">Active Target</span>}
                     </span>
                     <div className="flex items-center gap-2">
@@ -303,7 +304,7 @@ export default function Shelves() {
       <section className="card mt-3 border-2 border-ink bg-sheet">
         <div className="flex flex-wrap justify-between items-center gap-2 mb-2 pb-1.5 border-b border-ink">
           <div className="flex items-center gap-2">
-            <span className="font-serif font-bold text-[.95rem]">⚡ Rapid Ingestion & Placement Dock</span>
+            <span className="font-serif font-bold text-base flex items-center gap-1.5"><Zap className="w-4 h-4 text-[#CCFF00]" /> Rapid Ingestion & Placement Dock</span>
             <span className="text-muted text-[.8rem]">
               Active target: <strong className="font-mono text-ink">{activeTarget.aisle} · {activeTarget.rack} · {activeTarget.shelf}</strong>
             </span>

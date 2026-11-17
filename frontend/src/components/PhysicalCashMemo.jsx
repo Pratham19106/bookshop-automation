@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../lib/auth';
 import { fmt } from '../lib/format';
+import { Printer, Download, ExternalLink } from 'lucide-react';
 
 function splitCents(cents) {
   const c = Math.max(0, cents || 0);
@@ -105,7 +106,8 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
               onClick={handlePrint}
               title="Print Cash Memo (Ctrl+P)"
             >
-              <span>🖨️ Print Memo</span>
+              <Printer className="w-4 h-4" />
+              <span>Print Memo</span>
             </button>
             <button
               type="button"
@@ -113,16 +115,18 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
               onClick={handleDownloadPdf}
               title="Download Authentic PDF generated with Puppeteer"
             >
-              <span>📥 Download PDF</span>
+              <Download className="w-4 h-4" />
+              <span>Download PDF</span>
             </button>
             <a
               href={`/api/sales/${bill.id}/html`}
               target="_blank"
               rel="noreferrer"
-              className="btn btn-sm"
+              className="btn btn-sm flex items-center gap-1"
               title="Open standalone printable bill in new window"
             >
-              Standalone Tab ↗
+              <span>Standalone Tab</span>
+              <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         </div>

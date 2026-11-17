@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { get, qs } from '../lib/api';
@@ -7,6 +7,8 @@ import { bookName, daysAgo, fmt, fmtDate, today } from '../lib/format';
 import { useLoad } from '../lib/hooks';
 import { EASE, Reveal, Stagger, StaggerItem } from '../lib/motion';
 import { Async, Badge, Empty, PageTitle, Tile, tone } from '../lib/ui';
+import { subscribeToActivity, supabase } from '../lib/supabase';
+import { Zap } from 'lucide-react';
 
 // Net sales over time. The line draws itself in (slowly), then the area beneath it fades up.
 function Bars({ series }) {
@@ -95,13 +97,44 @@ export default function Dashboard() {
   const range = (n) => setF((x) => ({ ...x, from: daysAgo(n), to: today() }));
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
 
+  // Realtime updates: reload financial metrics automatically when sales, returns, or void events occur
+  useEffect(() => {
+    const unsub = subscribeToActivity(({ event }) => {
+      if (['sale', 'return', 'void'].includes(event)) {
+        st.reload();
+      }
+    });
+
+    let pgChannel = null;
+    try {
+      if (supabase) {
+        pgChannel = supabase.channel('dashboard-pg-sales')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
+            st.reload();
+          })
+          .subscribe();
+      }
+    } catch {}
+
+    return () => {
+      unsub();
+      if (pgChannel && supabase) supabase.removeChannel(pgChannel);
+    };
+  }, [st.reload]);
+
   return (
     <div>
       <PageTitle
         actions={
-          <span className="bg-[#DBEAFE] text-[#1D4ED8] font-mono text-xs font-bold px-2.5 py-1 border border-[#1D4ED8] shadow-[2px_2px_0px_0px_#1D4ED8]">
-            07 · Financial Engine
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ECFDF5] text-[#059669] border border-[#059669] text-xs font-mono font-bold shadow-[2px_2px_0px_0px_#059669]">
+              <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping" />
+              Realtime Engine
+            </span>
+            <span className="bg-[#DBEAFE] text-[#1D4ED8] font-mono text-xs font-bold px-2.5 py-1 border border-[#1D4ED8] shadow-[2px_2px_0px_0px_#1D4ED8]">
+              07 · Financial Engine
+            </span>
+          </div>
         }
       >
         Dashboard

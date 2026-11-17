@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { createContext, useContext, useEffect, useState, useMemo, useCallback } from 'react';
 import { useAuth } from './auth';
-import { DEFAULT_FRANCHISES, getFranchises } from './supabase';
+import { get } from './api';
+import { DEFAULT_FRANCHISES, getFranchises, subscribeToActivity } from './supabase';
 
 const FranchiseContext = createContext(null);
 
@@ -12,6 +13,27 @@ export function FranchiseProvider({ children }) {
     return localStorage.getItem('bk_active_franchise') || DEFAULT_FRANCHISES[0].id;
   });
 
+  const refreshFranchises = useCallback(async () => {
+    try {
+      const data = await get('/franchises');
+      if (Array.isArray(data) && data.length > 0) {
+        setFranchises(data);
+        return data;
+      }
+    } catch {}
+
+    try {
+      const list = await getFranchises();
+      if (list && list.length > 0) {
+        setFranchises(list);
+        return list;
+      }
+    } catch {}
+
+    return franchises;
+  }, [franchises]);
+
+  // Initial load and sync with user authentication state
   useEffect(() => {
     if (user?.franchises && Array.isArray(user.franchises) && user.franchises.length > 0) {
       setFranchises(user.franchises);
@@ -21,19 +43,35 @@ export function FranchiseProvider({ children }) {
       return;
     }
 
-    let mounted = true;
-    getFranchises().then((list) => {
-      if (mounted && list && list.length > 0) {
-        setFranchises(list);
-        if (!list.some((f) => f.id === activeId)) {
-          setActiveId(list[0].id);
+    if (user) {
+      refreshFranchises();
+    } else {
+      getFranchises().then((list) => {
+        if (list && list.length > 0) {
+          setFranchises(list);
         }
+      });
+    }
+  }, [user, refreshFranchises]);
+
+  // Re-verify activeId exists in current franchises
+  useEffect(() => {
+    if (franchises.length > 0 && !franchises.some((f) => f.id === activeId)) {
+      setActiveId(franchises[0].id);
+    }
+  }, [franchises, activeId]);
+
+  // Realtime subscription for multi-store additions/updates
+  useEffect(() => {
+    const unsub = subscribeToActivity((act) => {
+      if (act?.event === 'franchise') {
+        refreshFranchises();
       }
     });
     return () => {
-      mounted = false;
+      if (typeof unsub === 'function') unsub();
     };
-  }, [user, activeId]);
+  }, [refreshFranchises]);
 
   const selectFranchise = (id) => {
     setActiveId(id);
@@ -50,9 +88,10 @@ export function FranchiseProvider({ children }) {
       currentFranchise,
       activeId: currentFranchise ? currentFranchise.id : '',
       selectFranchise,
+      refreshFranchises,
       hasOutlets: franchises.length > 0,
     }),
-    [franchises, currentFranchise]
+    [franchises, currentFranchise, refreshFranchises]
   );
 
   return <FranchiseContext.Provider value={value}>{children}</FranchiseContext.Provider>;
@@ -66,6 +105,7 @@ export function useFranchise() {
       currentFranchise: DEFAULT_FRANCHISES[0],
       activeId: DEFAULT_FRANCHISES[0].id,
       selectFranchise: () => {},
+      refreshFranchises: async () => DEFAULT_FRANCHISES,
       hasOutlets: true,
     };
   }
