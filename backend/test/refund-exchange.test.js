@@ -41,6 +41,11 @@ describe('Refund and Exchange Policies', () => {
       assert.equal(refundedSale.returns.length, 1);
       assert.equal(refundedSale.returns[0].type, 'refund');
       assert.equal(refundedSale.returns[0].quantity, 1);
+
+      // Voiding restores only the remaining copy, not the already-refunded one.
+      const voidRes = await asOwner.post(`/api/sales/${sale.id}/void`, { reason: 'Test reversal' });
+      assert.equal(voidRes.status, 200);
+      assert.equal(stock(book.id).s, 10);
     } finally {
       await close();
     }

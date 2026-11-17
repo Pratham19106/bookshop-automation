@@ -180,7 +180,8 @@ function voidSale(db, user, id, input) {
     if (sale.status === 'voided') throw conflict('This bill has already been voided');
     if (sale.order_id) throw conflict('This bill was generated from a phone order and cannot be voided here');
     for (const it of db.prepare('SELECT * FROM sale_items WHERE sale_id = ?').all(id)) {
-      applyStock(db, { bookId: it.book_id, stockDelta: it.quantity, reason: 'sale_void', refType: 'sale', refId: id, note: `${sale.bill_no} voided: ${reason}`, userId: user.id });
+      const remaining = it.quantity - (it.returned_qty || 0);
+      if (remaining > 0) applyStock(db, { bookId: it.book_id, stockDelta: remaining, reason: 'sale_void', refType: 'sale', refId: id, note: `${sale.bill_no} voided: ${reason}`, userId: user.id });
     }
     db.prepare("UPDATE sales SET status='voided', void_reason=?, voided_by=?, voided_at=? WHERE id=?")
       .run(reason, user.id, new Date().toISOString(), id);

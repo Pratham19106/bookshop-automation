@@ -16,14 +16,12 @@ import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
 import Settings from './pages/Settings';
 import Receipt from './pages/Receipt';
-import ReceiptPage from './pages/Receipt';
 import Landing from './pages/Landing';
 import Help from './pages/Help';
 import Shelves from './pages/Shelves';
 import RegisterBusiness from './pages/RegisterBusiness';
 import {
   ShoppingCart,
-  Receipt as re,
   Receipt as ReceiptIcon,
   PhoneCall,
   BookMarked,
@@ -45,7 +43,6 @@ import {
 // path -> sidebar group, title, component, owner-only flag, icon
 const PAGES = [
   { path: '/billing', group: 'Sales', title: 'Billing', el: <Billing />, icon: ShoppingCart },
-  { path: '/bills', group: 'Sales', title: 'Bills', el: <Bills />, icon: Receipt },
   { path: '/bills', group: 'Sales', title: 'Bills', el: <Bills />, icon: ReceiptIcon },
   { path: '/orders', group: 'Sales', title: 'Phone Orders', el: <Orders />, icon: PhoneCall },
   { path: '/catalogue', group: 'Stock', title: 'Catalogue', el: <Catalogue />, icon: BookMarked },
@@ -218,8 +215,7 @@ function Shell({ pages }) {
           {pages.map((p) => (
             <Route key={p.path} path={p.path} element={p.el} />
           ))}
-          <Route path="/receipt/:id" element={<re />} />
-          <Route path="/receipt/:id" element={<ReceiptPage />} />
+          <Route path="/receipt/:id" element={<Receipt />} />
           <Route path="*" element={<Navigate to={isOwner ? '/dashboard' : '/billing'} replace />} />
         </Routes>
       </main>
