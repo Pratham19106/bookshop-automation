@@ -1,13 +1,22 @@
 const { createClient } = require('@supabase/supabase-js');
 const config = require('../config');
 
+// Polyfill global WebSocket for Node environments if not present natively
+try {
+  if (typeof globalThis.WebSocket === 'undefined') {
+    globalThis.WebSocket = require('ws');
+  }
+} catch {}
+
 const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || 'https://swbdnpjkqoydqwyqnzoz.supabase.co';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'sb_publishable_Jt1DTLvzGODgzapa9NytYA_Ylro2Yec';
 
 let client = null;
 try {
   if (supabaseUrl && supabaseKey) {
-    client = createClient(supabaseUrl, supabaseKey);
+    client = createClient(supabaseUrl, supabaseKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
   }
 } catch (err) {
   console.warn('Supabase client failed to initialize:', err.message);
