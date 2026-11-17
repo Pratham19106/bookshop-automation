@@ -21,8 +21,8 @@ test('wrong password and unknown user both give the same 401', async () => {
   assert.equal(a.body.error.message, b.body.error.message);
 });
 
-test('passwords are stored hashed, never in plain text', () => {
-  const row = t.db.prepare("SELECT password_hash FROM users WHERE username='owner'").get();
+test('passwords are stored hashed, never in plain text', async () => {
+  const row = await t.db.one("SELECT password_hash FROM users WHERE username = 'owner'");
   assert.notEqual(row.password_hash, 'owner-pass-1');
   assert.match(row.password_hash, /^\$2[aby]\$/);
 });
@@ -70,7 +70,7 @@ test('repeated failed logins are rate limited', async () => {
 });
 
 test('deactivated users cannot sign in or keep their session', async () => {
-  const created = await t.asOwner.post('/api/users', { username: 'temp', fullName: 'Temp', password: 'temp-pass-1', role: 'staff' });
+  const created = await t.asOwner.post('/api/users', { username: 'temp', fullName: 'Temp', password: 'temp-pass-1', role: 'staff', shopIds: [t.shop1] });
   assert.equal(created.status, 201);
   const c = t.client();
   assert.equal((await c.login('temp', 'temp-pass-1')).status, 200);

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { get, qs } from './api';
+import { get, getActiveShopId, qs } from './api';
+import { useQueryClient } from '@tanstack/react-query';
 import { fmt, label, STATUS_KIND } from './format';
 import { fail } from './overlays';
-import { useDebounced } from './hooks';
+import { useCached, useDebounced } from './hooks';
 import { BookCover } from './cover';
 
 // Run an async action; ignores re-entry while it runs (double-click safe) and reports errors as a toast.
@@ -10,7 +11,10 @@ export function useAction(fn) {
   const [busy, setBusy] = useState(false);
   const running = useRef(false);
   const alive = useRef(true);
-  useEffect(() => () => { alive.current = false; }, []);
+  useEffect(() => {
+    alive.current = true;
+    return () => { alive.current = false; };
+  }, []);
   const run = async (e) => {
     e?.preventDefault?.();
     if (running.current) return undefined;
@@ -50,7 +54,7 @@ export function Modal({ title, wide = false, onClose, children }) {
           ✕
         </button>
       </div>
-      <div className="p-4 max-h-[82vh] overflow-y-auto bg-white">{children}</div>
+      <div className="p-3 sm:p-4 max-h-[82vh] max-h-[82dvh] overflow-y-auto bg-white">{children}</div>
     </dialog>
   );
 }
@@ -83,7 +87,8 @@ export function Async({ state, children }) {
       </div>
     );
   }
-  if (state.error) return <div className="error-box">{state.error.message}</div>;
+  if (state.error && !state.data) return <div className="error-box">{state.error.message}</div>;
+  if (state.error) return <><div className="error-box" role="status">Could not refresh: {state.error.message}. Showing last loaded data.</div>{children(state.data)}</>;
   return state.data ? children(state.data) : null;
 }
 
@@ -92,7 +97,7 @@ export const PageTitle = ({ children, actions }) => (
     <div className="flex items-center gap-2">
       <h1 className="!border-0 !mb-0 pb-0">{children}</h1>
     </div>
-    <div className="flex items-center gap-2">{actions}</div>
+    <div className="flex flex-wrap items-center gap-2">{actions}</div>
   </div>
 );
 
@@ -115,22 +120,19 @@ export const Loc = ({ b }) => <span>{b.location || <span className="text-muted">
 // Book search box with clickable results. Enter picks the book when exactly one matches (scanner/ISBN friendly).
 export function BookPicker({ onPick, placeholder = 'Search title, author or ISBN…', showStock = true, autoFocus = false }) {
   const [q, setQ] = useState('');
-  const [items, setItems] = useState([]);
+  const client = useQueryClient();
   const dq = useDebounced(q.trim());
-  useEffect(() => {
-    let live = true;
-    if (!dq) { setItems([]); return undefined; }
-    get(`/books${qs({ q: dq, limit: 12 })}`).then((r) => { if (live) setItems(r.items); }).catch(fail);
-    return () => { live = false; };
-  }, [dq]);
+  const search = useCached(['books', 'picker', dq], () => get(`/books${qs({ q: dq, limit: 12 })}`), { enabled: !!dq });
+  const items = q.trim() === dq ? search.data?.items || [] : [];
 
-  const pick = (b) => { onPick(b); setQ(''); setItems([]); };
+  const pick = (b) => { onPick(b); setQ(''); };
   const onKey = async (e) => {
     if (e.key !== 'Enter') return;
     e.preventDefault();
     if (!q.trim()) return;
     try {
-      const r = await get(`/books${qs({ q: q.trim(), limit: 12 })}`);
+      const term = q.trim();
+      const r = await client.fetchQuery({ queryKey: ['books', getActiveShopId(), 'picker', term], queryFn: () => get(`/books${qs({ q: term, limit: 12 })}`), staleTime: 0 });
       if (r.items.length === 1) pick(r.items[0]);
     } catch (err) { fail(err); }
   };
@@ -148,9 +150,9 @@ export function BookPicker({ onPick, placeholder = 'Search title, author or ISBN
         autoFocus={autoFocus}
         aria-label="Search books"
       />
-      {dq ? (
+      {q.trim() && q.trim() === dq ? (
         <div className="mt-2 max-h-[56vh] overflow-y-auto border-2 border-black bg-white shadow-hard">
-          {items.length === 0 && <div className="p-4 text-center text-muted font-serif">No books match “{dq}”.</div>}
+          {search.error && !search.data ? <div className="p-4 error-box">{search.error.message}</div> : search.loading && !search.data ? <div className="p-4 text-center text-muted">Searching…</div> : items.length === 0 && <div className="p-4 text-center text-muted font-serif">No books match “{dq}”.</div>}
           {items.map((b) => (
             <button
               type="button"

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/auth';
 import { useAction, Field } from '../lib/ui';
-import { Building2, Zap, Sparkles, AlertTriangle, CheckCircle2, Trash2, Plus } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Trash2, Plus } from 'lucide-react';
 
 export default function RegisterBusiness() {
   const { registerBusiness } = useAuth();
@@ -114,32 +114,6 @@ export default function RegisterBusiness() {
     });
   };
 
-  const prefillDemo = (chainName, owner, user, pass, city1, city2) => {
-    setBusinessName(chainName);
-    setEmail(`contact@${chainName.toLowerCase().replace(/[^a-z0-9]/g, '')}.example`);
-    setPhone('+91 98765 43210');
-    setOwnerName(owner);
-    setUsername(user);
-    setPassword(pass);
-    setOutlets([
-      {
-        name: `${chainName} - ${city1} Flagship (HQ)`,
-        city: city1,
-        address: `100 Commercial Boulevard, ${city1}`,
-        phone: '040-6100 1111',
-        isHeadquarters: true,
-      },
-      {
-        name: `${chainName} - ${city2} Uptown Branch`,
-        city: city2,
-        address: `Level 2, Phoenix Centre, ${city2}`,
-        phone: '040-6200 2222',
-        isHeadquarters: false,
-      },
-    ]);
-    setErr('');
-  };
-
   return (
     <div className="min-h-screen bg-[#FAF9F5] text-ink font-sans flex flex-col justify-center px-4 py-10 selection:bg-[#CCFF00] selection:text-black text-base">
       <div className="max-w-[800px] w-full mx-auto animate-stamp">
@@ -147,14 +121,9 @@ export default function RegisterBusiness() {
           
 
           <div className="flex flex-wrap items-center justify-between pb-4 mb-6 border-b-2 border-black gap-2">
-            <div>
-              <h1 className="!border-0 !mb-0 text-3xl sm:text-4xl font-serif font-black text-black mt-1">
-                Register Your Bookshop Business
-              </h1>
-            </div>
-            <span className="inline-block px-3 py-1 bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold border-2 border-[#15803D]">
-              Direct Setup
-            </span>
+            <h1 className="!border-0 !mb-0 text-3xl sm:text-4xl font-serif font-black text-black mt-1">
+              Register your bookshop
+            </h1>
           </div>
 
           <form onSubmit={submit} className="space-y-6">
@@ -259,15 +228,12 @@ export default function RegisterBusiness() {
               <div className="flex flex-wrap items-center justify-between mb-2.5 gap-2">
                 <h2 className="text-base font-mono font-black uppercase text-black flex items-center gap-2">
                   <span className="w-6 h-6 bg-[#1A1A1A] text-[#CCFF00] flex items-center justify-center text-xs">3</span>
-                  Storefronts & Outlets ({outlets.length} Configured)
+                  Shops ({outlets.length})
                 </h2>
-                <span className="text-xs font-mono font-bold text-[#4F46E5] bg-[#EEF2FF] px-2.5 py-1 border border-[#4F46E5]">
-                  Add Outlets Now or Later
-                </span>
               </div>
 
               <p className="text-sm text-[#4B5563] mb-4">
-                Configure your physical stores and branches below with their individual addresses, or skip and add them anytime from the app.
+                Add each shop with its own address and phone; they are printed on that shop's bills. More shops can be added later in Settings.
               </p>
 
               {outlets.length === 0 ? (
@@ -339,13 +305,21 @@ export default function RegisterBusiness() {
                             />
                           </Field>
                         </div>
-                        <div className="sm:col-span-2">
-                          <Field label="Physical Address (Unique to this Shop)">
+                        <div>
+                          <Field label="Address">
                             <input
                               className="input font-sans text-sm py-2"
                               value={outlet.address}
                               onChange={(e) => updateOutlet(idx, 'address', e.target.value)}
-                              placeholder=""
+                            />
+                          </Field>
+                        </div>
+                        <div>
+                          <Field label="Shop phone">
+                            <input
+                              className="input font-mono text-sm py-2"
+                              value={outlet.phone}
+                              onChange={(e) => updateOutlet(idx, 'phone', e.target.value)}
                             />
                           </Field>
                         </div>
@@ -376,27 +350,22 @@ export default function RegisterBusiness() {
             {success && (
               <div className="p-3.5 bg-[#DCFCE7] border-2 border-[#15803D] text-[#15803D] font-mono text-sm font-bold animate-slide-up flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 text-[#15803D] flex-shrink-0" />
-                <span>Business created successfully! Launching terminal workspace…</span>
+                <span>Business registered. Opening your dashboard…</span>
               </div>
             )}
 
             <button
               type="submit"
-              className="btn btn-primary w-full py-4 text-base uppercase tracking-wider font-mono font-bold shadow-[4px_4px_0px_0px_#4F46E5]"
+              className="btn btn-primary w-full py-3.5 text-base"
               disabled={busy || success}
             >
-              {busy ? 'Registering Business…' : 'Complete Registration & Open Terminal →'}
+              {busy ? 'Registering…' : 'Register business'}
             </button>
           </form>
 
-          <div className="mt-6 pt-4 border-t-2 border-black flex flex-wrap items-center justify-between gap-3 text-sm font-mono font-bold">
-            <Link to="/login" className="text-[#4F46E5] hover:underline">
-              ← Already registered? Sign in here
-            </Link>
-            <Link to="/landing" className="text-black hover:underline">
-              ← Platform Overview
-            </Link>
-          </div>
+          <p className="mt-6 pt-4 border-t-2 border-black text-sm">
+            Already registered? <Link to="/login" className="font-semibold underline">Sign in</Link>
+          </p>
         </div>
       </div>
     </div>

@@ -9,7 +9,9 @@
     "seed": "npm --prefix backend run seed",
     "populate": "npm --prefix backend run seed -- --force",
     "test": "npm --prefix backend test",
-    "test:ui": "npm run build && npm --prefix backend run test:ui"
+    "test:ui": "npm run build && npm --prefix backend run test:ui",
+    "migrate": "npm --prefix backend run migrate",
+    "import-catalog": "npm --prefix backend run import-catalog"
   },
   "devDependencies": {
     "concurrently": "^10.0.6"

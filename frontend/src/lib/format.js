@@ -1,15 +1,29 @@
 let symbol = '₹';
 export const setCurrency = (s) => { symbol = s || '₹'; };
 
-export const fmt = (cents) =>
-  `${symbol}${((cents ?? 0) / 100).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+// Amounts travel in paise but are always whole rupees: no paise are ever shown or entered.
+export const roundRupee = (cents) => Math.round((cents ?? 0) / 100) * 100;
 
-// "199.50" -> 19950; null when blank or not a valid amount
+export const fmt = (cents) => {
+  const rupees = Math.round((cents ?? 0) / 100);
+  return `${rupees < 0 ? '−' : ''}${symbol}${Math.abs(rupees).toLocaleString('en-IN')}`;
+};
+
+// "199" -> 19900; "199.50" is rounded to the nearest rupee (20000); null when blank or not a valid amount
 export function parseMoney(s) {
-  const t = String(s ?? '').trim();
-  return /^\d+(\.\d{1,2})?$/.test(t) ? Math.round(Number(t) * 100) : null;
+  const t = String(s ?? '').trim().replace(/,/g, '');
+  return /^\d+(\.\d{1,2})?$/.test(t) ? Math.round(Number(t)) * 100 : null;
 }
-export const money = (cents) => (cents / 100).toFixed(2);
+// Value for an amount input field (whole rupees).
+export const money = (cents) => String(Math.round((cents ?? 0) / 100));
+
+// Same arithmetic as the server (backend/src/lib/money.js computeTotals): discount and tax to the nearest rupee.
+export function billTotals(subtotalCents, discountPercent, taxPercent) {
+  const sub = roundRupee(subtotalCents);
+  const disc = roundRupee((sub * Math.round((Number(discountPercent) || 0) * 100)) / 10000);
+  const tax = roundRupee(((sub - disc) * Math.round((Number(taxPercent) || 0) * 100)) / 10000);
+  return { sub, disc, tax, total: sub - disc + tax };
+}
 
 export const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '');
 export const fmtDateTime = (iso) => (iso ? new Date(iso).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '');

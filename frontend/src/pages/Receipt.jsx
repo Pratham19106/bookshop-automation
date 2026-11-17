@@ -1,12 +1,12 @@
 import { Link, useParams } from 'react-router-dom';
 import { get } from '../lib/api';
-import { useLoad } from '../lib/hooks';
+import { useCached } from '../lib/hooks';
 import { Async } from '../lib/ui';
 import PhysicalCashMemo from '../components/PhysicalCashMemo';
 
 export default function Receipt() {
   const { id } = useParams();
-  const st = useLoad(() => get(`/sales/${Number(id)}`), [id]);
+  const st = useCached(['bills', 'detail', Number(id)], () => get(`/sales/${Number(id)}`));
   return (
     <Async state={st}>
       {(b) => (

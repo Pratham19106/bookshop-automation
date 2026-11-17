@@ -1,57 +1,70 @@
 const v = require('../lib/validate');
 const { DAY } = require('../lib/dates');
+const { requireShop } = require('../lib/tenant');
 const { getSettings } = require('./settings');
 
 /*
- * Rule-based restocking. For each active book:
- *   velocity       = units sold (completed bills) in the analysis window / days actually observed
+ * Rule-based restocking for the active shop. For each active title of the business:
+ *   velocity       = units sold in this shop (completed bills) in the analysis window / days actually observed
  *   available      = stock - reserved for phone orders
- *   onOrder        = units still outstanding on open purchase orders
+ *   onOrder        = units still outstanding on this shop's open purchase orders
  *   daysOfCover    = available / velocity
  *   targetStock    = ceil(velocity * coverDays) + threshold      (demand over the cover period + safety buffer)
  *   suggestedQty   = max(1, targetStock - (available + onOrder))
- * A book is flagged when any rule fires:
+ * A title is flagged when any rule fires:
  *   out_of_stock  : available <= 0 and it sold in the window
  *   will_run_out  : daysOfCover < supplier lead time (stock would run out before a new order could arrive)
- *   below_threshold: available <= threshold and the incoming purchase orders do not lift it above the threshold
- * "Days observed" is limited by how long the book has existed and how long the shop has been recording sales, so
+ *   below_threshold: available <= threshold and incoming purchase orders do not lift it above the threshold
+ * "Days observed" is limited by how long the title has existed and how long the shop has been recording sales, so
  * young data is never divided by a window it did not cover; thin data is marked low-confidence instead of hidden.
+ * Titles never stocked in the shop and never sold there are skipped (they are not this shop's range).
  */
 const URGENCY_RANK = { critical: 0, high: 1, medium: 2, low: 3 };
 const MIN_DAYS_FOR_CONFIDENCE = 14;
 const MIN_UNITS_FOR_CONFIDENCE = 3;
 
-function recommendations(db, opts = {}) {
-  const settings = getSettings(db);
+async function recommendations(ctx, opts = {}) {
+  const shopId = requireShop(ctx);
+  const settings = await getSettings(ctx.db, ctx.businessId);
   const lookback = v.int(opts.lookbackDays ?? settings.restockLookbackDays, 'lookbackDays', { min: 7, max: 365 });
   const cover = v.int(opts.coverDays ?? settings.restockCoverDays, 'coverDays', { min: 1, max: 365 });
   const now = opts.now ? new Date(opts.now) : new Date();
   const since = new Date(now.getTime() - lookback * DAY).toISOString();
 
-  const firstSale = db.prepare("SELECT MIN(created_at) AS t FROM sales WHERE status = 'completed'").get().t;
+  const { t: firstSale } = await ctx.db.one(`SELECT MIN(created_at) AS t FROM sales WHERE shop_id = $1 AND status = 'completed'`, [shopId]);
   const historyDays = firstSale ? Math.max(0, (now - new Date(firstSale)) / DAY) : 0;
 
-  const sold = new Map(db.prepare(`SELECT si.book_id, SUM(si.quantity) AS q FROM sale_items si JOIN sales s ON s.id = si.sale_id
-                                    WHERE s.status = 'completed' AND s.created_at >= ? GROUP BY si.book_id`).all(since).map((r) => [r.book_id, r.q]));
-  const onOrder = new Map(db.prepare(`SELECT i.book_id, SUM(i.qty_ordered - i.qty_received) AS q FROM purchase_order_items i
-                                       JOIN purchase_orders po ON po.id = i.po_id WHERE po.status IN ('ordered','partially_received') GROUP BY i.book_id`)
-    .all().map((r) => [r.book_id, r.q]));
-  const supplierRows = db.prepare(`SELECT sb.book_id, s.id, s.name, s.lead_time_days, sb.unit_cost_cents FROM supplier_books sb
-                                     JOIN suppliers s ON s.id = sb.supplier_id WHERE s.active = 1 ORDER BY sb.unit_cost_cents, s.lead_time_days`).all();
+  const sold = new Map((await ctx.db.many(`SELECT si.book_id, SUM(si.quantity) AS q FROM sale_items si JOIN sales s ON s.id = si.sale_id
+                                            WHERE s.shop_id = $1 AND s.status = 'completed' AND s.created_at >= $2 GROUP BY si.book_id`, [shopId, since]))
+    .map((r) => [r.book_id, r.q]));
+  const onOrder = new Map((await ctx.db.many(`SELECT i.book_id, SUM(i.qty_ordered - i.qty_received) AS q FROM purchase_order_items i
+                                               JOIN purchase_orders po ON po.id = i.po_id
+                                              WHERE po.shop_id = $1 AND po.status IN ('ordered','partially_received') GROUP BY i.book_id`, [shopId]))
+    .map((r) => [r.book_id, r.q]));
+  const supplierRows = await ctx.db.many(`SELECT sb.book_id, s.id, s.name, s.lead_time_days, sb.unit_cost_cents FROM supplier_books sb
+                                            JOIN suppliers s ON s.id = sb.supplier_id
+                                           WHERE s.business_id = $1 AND s.active ORDER BY sb.unit_cost_cents, s.lead_time_days`, [ctx.businessId]);
   const suppliers = new Map();
   for (const r of supplierRows) {
     if (!suppliers.has(r.book_id)) suppliers.set(r.book_id, []);
     suppliers.get(r.book_id).push({ supplierId: r.id, name: r.name, unitCostCents: r.unit_cost_cents, leadTimeDays: r.lead_time_days });
   }
 
+  const books = await ctx.db.many(`SELECT b.id, b.title, b.author, b.edition, b.isbn, b.created_at, ss.book_id IS NOT NULL AS stocked,
+                                          COALESCE(ss.stock_qty, 0) AS stock_qty, COALESCE(ss.reserved_qty, 0) AS reserved_qty,
+                                          ss.low_stock_threshold, COALESCE((SELECT string_agg(sh.aisle || ' · ' || sh.rack || ' · ' || sh.shelf || ' (' || x.qty || ')', ', ' ORDER BY sh.aisle,sh.rack,sh.shelf)
+                                            FROM shelf_stock x JOIN shelves sh ON sh.id=x.shelf_id WHERE x.shop_id=$2 AND x.book_id=b.id AND x.qty>0),'') AS location
+                                     FROM books b LEFT JOIN shop_stock ss ON ss.book_id = b.id AND ss.shop_id = $2
+                                    WHERE b.business_id = $1 AND b.active`, [ctx.businessId, shopId]);
   const out = [];
-  for (const b of db.prepare('SELECT * FROM books WHERE active = 1').all()) {
+  for (const b of books) {
     const unitsSold = sold.get(b.id) || 0;
+    const incoming = onOrder.get(b.id) || 0;
+    if (!b.stocked && !unitsSold && !incoming) continue;
     const bookAgeDays = (now - new Date(b.created_at)) / DAY;
     const observedDays = Math.max(1, Math.min(lookback, bookAgeDays, firstSale ? historyDays : 0));
     const velocity = unitsSold / observedDays;
     const available = b.stock_qty - b.reserved_qty;
-    const incoming = onOrder.get(b.id) || 0;
     const threshold = b.low_stock_threshold ?? settings.defaultLowStockThreshold;
     const supp = suppliers.get(b.id) || [];
     const leadTime = supp.length ? Math.min(...supp.map((s) => s.leadTimeDays)) : settings.restockDefaultLeadTimeDays;
@@ -73,7 +86,6 @@ function recommendations(db, opts = {}) {
     }
     if (!reasons.length) continue;
 
-    // Already-ordered stock that will cover the shortfall downgrades but never hides the row.
     if (incoming > 0) reasons.push(`${incoming} already on order from suppliers`);
     const target = Math.ceil(velocity * cover) + threshold;
     const suggestedQty = Math.max(1, target - (available + incoming));
@@ -87,7 +99,7 @@ function recommendations(db, opts = {}) {
 
     out.push({
       bookId: b.id, title: b.title, author: b.author, edition: b.edition, isbn: b.isbn,
-      location: [b.aisle && `Aisle ${b.aisle}`, b.rack && `Rack ${b.rack}`, b.shelf && `Shelf ${b.shelf}`].filter(Boolean).join(' · '),
+      location: b.location,
       urgency, reasons, caveats, confidence,
       metrics: {
         unitsSold, windowDays: lookback, observedDays: round1(observedDays), velocityPerDay: round2(velocity),

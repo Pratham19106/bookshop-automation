@@ -1,407 +1,196 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
-import { useAuth } from '../lib/auth';
 
+// Plain-language user manual. Roles: Owner (whole business), Manager (assigned shops), Staff (counter work in their shop).
 const HELP_SECTIONS = [
   {
-    id: 'billing',
-    title: 'Point-of-Sale Billing',
-    group: 'Sales',
-    path: '/billing',
-    role: 'Owner & Staff',
-    summary: 'Ringing up counter sales, scanning ISBNs, applying discounts, finalizing transactions, and printing receipts.',
+    id: 'billing', title: 'Billing', group: 'Sales', path: '/billing', role: 'Everyone',
+    summary: 'Sell books at the counter and print the bill.',
     steps: [
-      'Search for books using the barcode/ISBN scanner or typing title/author in the book search field.',
-      'Click or press Enter on the search result to add the item to the active bill register.',
-      'Adjust quantities using the + / - buttons or the numeric quantity input. The system strictly blocks overselling beyond available on-hand stock.',
-      'Optionally specify a customer name and phone number for purchase records.',
-      'Apply a bill discount percentage if needed. Staff accounts are restricted to the shop discount limit configured in Settings.',
-      'Hold / Save Draft: If a customer needs to fetch more books or look for cash, click "Hold / Save Draft" to park their cart into the draft queue and immediately free the register for another customer.',
-      'Resume Parked Draft: Click "Parked Drafts" at the top of the bill section to view all held tickets. Click "Resume Draft" to restore any parked customer bill back into the register.',
-      'Review the itemized totals, tax (calculated on discounted subtotal), and final grand total.',
-      'Click "Finalize Bill (Enter)" to commit the sale. The transaction runs atomically in the database and immediately prints or opens the receipt.'
+      'Search by title, author or ISBN (a barcode scanner types the ISBN) and pick the book.',
+      'Change the quantity if needed. You cannot sell more copies than the shop has available.',
+      'Optionally enter the customer name and phone, a discount and the payment method.',
+      'Click "Finalize bill". The bill gets the next number for this shop (e.g. INV-S01-000042) and the receipt opens.',
+      'To serve someone else first, click "Hold" to park the cart; resume it later from "Parked drafts".',
     ],
     rules: [
-      'Persistent Auto-Save: The active bill is auto-saved locally in real-time. Switching windows, navigating between pages, or accidental browser reloads will never erase your active cart.',
-      'Multi-Customer Queue: You can park multiple customer drafts simultaneously. Resuming a draft while another cart is active automatically parks the current cart so nothing is lost.',
-      'Atomic Transaction: The bill, line items, and stock deductions are processed in a single BEGIN IMMEDIATE database transaction.',
-      'Historical Cost Snapshot: Each sale records the item cost at the exact time of sale so financial reporting (COGS) remains accurate even if costs change later.',
-      'Idempotency: Resubmitting the same bill submission avoids duplicate charges.'
-    ]
+      'Discount limits: staff up to 10%, managers up to 25% (the owner can change both in Settings).',
+      'Stock is taken off at the moment the bill is saved; two counters can never sell the same last copy.',
+      'Clicking "Finalize" twice does not create two bills.',
+    ],
   },
   {
-    id: 'bills',
-    title: 'Bills & Sales Register',
-    group: 'Sales',
-    path: '/bills',
-    role: 'Owner & Staff (Void: Owner only)',
-    summary: 'Historical ledger of finalized sales, reprint duplicate receipts, and void erroneous transactions.',
+    id: 'bills', title: 'Bills, returns and exchanges', group: 'Sales', path: '/bills', role: 'Everyone (void: owner)',
+    summary: 'Find past bills, reprint them, refund or exchange books.',
     steps: [
-      'Browse chronological invoices with invoice number, date/time, items count, cashier name, and grand total.',
-      'Click on any invoice row to expand its full line-item details, applied discounts, and tax breakdowns.',
-      'Click "Print Receipt" to reprint the thermal or standard receipt at any time.',
-      'If an error occurred on a counter sale, an Owner can click "Void Bill". Staff cannot void bills.'
+      'Search by bill number or customer, or filter by date and status. Click a bill to open it.',
+      'Click "Return / exchange", select the returned quantities and optionally add replacement books.',
+      'Review the difference, choose the settlement method and confirm. Print the linked adjustment bill if needed.',
+      'The owner can void an unadjusted counter bill entered by mistake.',
     ],
     rules: [
-      'Voiding Restores Stock: Voiding an invoice immediately credits the books back into inventory and marks the invoice as VOID.',
-      'Reports Exclusion: Voided bills are excluded from dashboard sales figures and revenue reports.',
-      'Phone Order Protection: Phone order invoices cannot be voided from the Bills screen; cancel the order prior to completion instead.'
-    ]
+      'Returns and exchanges are accepted within the return window set in Settings (7 days by default).',
+      'Each adjustment has its own bill, linked to the original sale. Replacements inherit the original discount and tax rates.',
+      'Bills from phone orders cannot be voided; cancel the order instead.',
+    ],
   },
   {
-    id: 'orders',
-    title: 'Phone-in Orders & Reservations',
-    group: 'Sales',
-    path: '/orders',
-    role: 'Owner & Staff',
-    summary: 'Manage customer telephone reservations, advance deposits, and delivery/pickup fulfillment lifecycle.',
+    id: 'orders', title: 'Phone orders', group: 'Sales', path: '/orders', role: 'Everyone',
+    summary: 'Take orders by phone, hold the books, and bill them on pickup or delivery.',
     steps: [
-      'Click "+ New Phone Order" and enter customer name, phone number, and optional delivery address.',
-      'Add items to the order. The system immediately reserves the required quantity so counter customers cannot buy them.',
-      'Record any advance payment received (Cash, Card, UPI, or Bank Transfer).',
-      'Progress the order status through the lifecycle: Placed → Ready for Pickup/Dispatch → Completed.',
-      'When the customer collects and pays the balance, click "Complete & Bill" to deduct physical inventory and generate an official invoice.'
+      'Click "New order", enter the customer and add the books. Those copies are set aside at once.',
+      'Record any advance payment.',
+      'Mark the order Ready, then Out for delivery if it is delivered.',
+      'Click "Complete & bill" when the customer pays the balance; a normal bill is created.',
     ],
     rules: [
-      'Stock Reservation: Reserved stock is subtracted from available counter stock upon order placement, avoiding double-selling.',
-      'Payment Ledger: Advance payments are tracked independently and recognized as sales revenue only when the order is marked Completed.',
-      'Order Cancellation: Cancelling an order immediately releases all reserved stock back to the shelf.'
-    ]
+      'Set-aside copies cannot be sold at the counter.',
+      'Cancelling an order puts the copies back on sale; advance payments are refunded from the order.',
+    ],
   },
   {
-    id: 'catalogue',
-    title: 'Book Catalogue & Shelf Locations',
-    group: 'Stock',
-    path: '/catalogue',
-    role: 'Owner & Staff',
-    summary: 'Master inventory book records, ISBN-10/13 checksum validation, pricing, and physical store coordinates.',
+    id: 'catalogue', title: 'Catalogue', group: 'Stock', path: '/catalogue', role: 'Everyone (edit: manager, owner)',
+    summary: 'The list of titles your business sells, with price, stock in this shop and shelf location.',
     steps: [
-      'Use the search bar to find books by title, author, publisher, genre, or ISBN.',
-      'Click "+ Add Book" to catalog a new edition with title, author, publisher, publication year, edition, and retail price.',
-      'Provide an ISBN-10 or ISBN-13. The system validates the standard mathematical checksum to prevent typos.',
-      'Tag the exact physical store coordinates: Aisle, Rack, and Shelf (e.g., "Aisle 2, Rack B, Shelf 4"). Staff can instantly locate copies for customers.',
-      'Set an optional low-stock alert threshold specific to this title.'
+      'Search by title, author, ISBN or publisher; click a title to see its stock history.',
+      'Managers add a title with "Add book": type an ISBN or title to find it in the ISBN catalogue, pick it, then set the price and opening stock.',
+      'Use "Correct stock" after a physical count; a reason is required.',
     ],
     rules: [
-      'Checksum Verification: Invalid ISBN checksums or duplicate ISBNs across editions are refused.',
-      'Fallback Identity: If no ISBN is available, title + author + edition + publisher must be uniquely identifiable.'
-    ]
+      'Titles and prices are shared by all shops; stock and shelf location are per shop.',
+      'An ISBN can be added only once per business.',
+    ],
   },
   {
-    id: 'inventory',
-    title: 'Inventory Audit & Stock Adjustments',
-    group: 'Stock',
-    path: '/inventory',
-    role: 'Owner & Staff (Adjustments: Owner only)',
-    summary: 'Real-time on-hand stock monitoring, reserved stock tracking, and recorded physical audit corrections.',
-    steps: [
-      'Filter stock by location or low-stock warning status to spot books needing shelf replenishment.',
-      'View On-Hand, Reserved (phone orders), and Available quantities for every title.',
-      'During physical counts, an Owner can click "Adjust Stock" to correct discrepancies.',
-      'Enter the actual counted quantity and select a required audit reason (e.g., "Physical inventory count", "Damaged copy", "Found stock").'
-    ],
-    rules: [
-      'Zero Negative Stock Constraint: Database CHECK constraints prevent available stock from dropping below zero.',
-      'Append-Only Movement Ledger: Every single stock increase, sale, reservation, and manual correction is recorded in the permanent stock_movements table.'
-    ]
+    id: 'inventory', title: 'Inventory', group: 'Stock', path: '/inventory', role: 'Everyone',
+    summary: 'Stock on hand, copies set aside for phone orders, and copies available, for this shop.',
+    steps: ['Filter to "Low stock" to see what needs reordering.'],
+    rules: ['Stock never goes below zero; every change is recorded with its reason.'],
   },
   {
-    id: 'restock',
-    title: 'Rule-Based Restocking Recommendations',
-    group: 'Stock',
-    path: '/restock',
-    role: 'Owner only',
-    summary: 'Automated purchasing intelligence based on observed sales velocity, cover days, and supplier lead times.',
-    steps: [
-      'Review flagged titles categorized by urgency (Critical, High, Medium).',
-      'Examine the plain-language explanation showing exactly why a book was recommended for reorder.',
-      'Inspect the math: observed daily sales velocity (excluding voided sales), current available stock, open purchase orders, and supplier lead time.',
-      'See the suggested order quantity calculated to cover expected sales plus safety buffer.',
-      'Click "Create PO" next to the recommended cheapest quoting supplier to generate a purchase order draft.'
-    ],
-    rules: [
-      'True Velocity: Calculated only across days the store actually traded, avoiding misleading dilution from closed days.',
-      'Low Confidence Labeling: If sales history is under 14 days, recommendations are flagged with "Low Confidence" rather than hidden.'
-    ]
+    id: 'shelves', title: 'Floor & shelves', group: 'Stock', path: '/shelves', role: 'Everyone (edit: manager, owner)',
+    summary: 'Where each book sits: aisle, rack and shelf.',
+    steps: ['Managers create shelves using the layout form and can edit each shelf.', 'Open Books to Arrange, select copies, choose a shelf and confirm after placement.'],
+    rules: ['Shelf capacities count copies. Only confirmed placements appear in catalogue locations.'],
   },
   {
-    id: 'suppliers',
-    title: 'Suppliers & Quoted Price Matrix',
-    group: 'Stock',
-    path: '/suppliers',
-    role: 'Owner only',
-    summary: 'Vendor records, lead time in days, payment terms, and per-book wholesale price quotes.',
+    id: 'restock', title: 'Restocking', group: 'Stock', path: '/restock', role: 'Manager, owner',
+    summary: 'Suggested reorders for this shop, with the figures behind each suggestion.',
     steps: [
-      'Click "+ Add Supplier" to register distributor name, contact person, email, phone, and standard lead time in days.',
-      'Assign quoted prices for specific book ISBNs to each supplier.',
-      'Compare competing wholesale prices across multiple suppliers for the same title to secure maximum margin.',
-      'Track active supplier status and contact information for rapid reordering.'
+      'Each suggestion shows copies sold per day, stock available, copies already on order and supplier lead time.',
+      'Tick the titles to order and click "Create purchase order".',
     ],
     rules: [
-      'Lead Time Integration: Supplier lead time is directly fed into the restocking engine to calculate safety stock days.',
-      'Cost Quotes: Quoted prices are updated automatically when receiving higher or lower costs on goods delivery.'
-    ]
+      'Sales per day are counted over the days the shop actually traded.',
+      'Suggestions based on less than 14 days of sales are marked "low confidence".',
+    ],
   },
   {
-    id: 'purchases',
-    title: 'Purchases & Goods Receipts',
-    group: 'Stock',
-    path: '/purchases',
-    role: 'Owner only',
-    summary: 'Purchase order management, shipment check-in, partial deliveries, and weighted-average cost updating.',
-    steps: [
-      'Click "+ New Purchase Order", select a supplier, and add required book titles with quantities and negotiated unit costs.',
-      'Send or print the purchase order for the distributor.',
-      'When deliveries arrive, open the PO and click "Receive Goods".',
-      'Enter the quantity actually received in this shipment. If fewer books arrived than ordered, the PO remains partially open.',
-      'Confirm the invoiced unit cost. The system automatically updates the stock count and computes the new weighted-average unit cost.'
-    ],
-    rules: [
-      'No Over-Receipt: The system prevents receiving more units than authorized on the purchase order.',
-      'Weighted-Average COGS: The unit cost of the book in inventory is recalibrated using the weighted average of existing stock and incoming delivery cost.'
-    ]
+    id: 'suppliers', title: 'Suppliers', group: 'Stock', path: '/suppliers', role: 'Manager, owner',
+    summary: 'Suppliers, their lead times and the price they quote per title.',
+    steps: ['Add a supplier with contact details and lead time, then add their quoted prices for titles.'],
+    rules: ['The quoted price is updated when goods are received at a different cost.'],
   },
   {
-    id: 'dashboard',
-    title: 'Financial & Operational Dashboard',
-    group: 'Reports',
-    path: '/dashboard',
-    role: 'Owner only',
-    summary: 'Business performance metrics, true COGS, gross margins, operating expenses, and net profit.',
+    id: 'purchases', title: 'Purchases', group: 'Stock', path: '/purchases', role: 'Manager, owner',
+    summary: 'Purchase orders to suppliers and receiving the delivery into this shop.',
     steps: [
-      'Select time range presets (Today, This Week, This Month) or pick custom start and end dates.',
-      'Choose grouping granularity (Daily, Weekly, Monthly) to analyze trend patterns.',
-      'Review Net Revenue (subtotal minus discounts, excluding tax collected).',
-      'Examine Cost of Goods Sold (COGS) evaluated from unit costs recorded at sale time.',
-      'Analyze Gross Profit (Revenue - COGS) and Gross Margin percentage.',
-      'Review Operating Expenses and final Net Operating Profit.'
+      'Create an order for a supplier with titles, quantities and cost.',
+      'When the delivery arrives, open the order and click "Receive" with the quantities that actually came.',
     ],
     rules: [
-      'No Double Counting: Operating profit deducts operating expenses; goods purchase costs are accounted for via COGS upon sale.',
-      'Unknown Cost Warnings: In the event a book sold without an established cost price, the dashboard flags the count so profit is never falsely overstated.'
-    ]
+      'Part deliveries are allowed; the order stays open until everything is received or it is cancelled.',
+      'You cannot receive more than was ordered. The book\'s cost becomes the average of old and new stock.',
+    ],
   },
   {
-    id: 'expenses',
-    title: 'Operating Expense Tracking',
-    group: 'Reports',
-    path: '/expenses',
-    role: 'Owner only',
-    summary: 'Track non-inventory overheads such as shop rent, electricity, packaging materials, and maintenance.',
-    steps: [
-      'Click "+ Record Expense" to log a store expenditure.',
-      'Enter the amount, expense date, category (e.g. Rent, Utilities, Packaging, Supplies, Marketing), and description.',
-      'Filter and inspect historical operational expenditures alongside revenue reports.'
-    ],
+    id: 'dashboard', title: 'Dashboard', group: 'Reports', path: '/dashboard', role: 'Manager, owner',
+    summary: 'Sales, profit, stock alerts and open orders for one shop or all shops.',
+    steps: ['Choose a shop (or all shops), a date range and day / week / month grouping.'],
     rules: [
-      'Overhead Separation: Operating expenses are kept distinct from supplier inventory purchases for correct P&L accounting.'
-    ]
+      'Net sales = bills after discount, before tax, minus refunds. Voided bills are never counted.',
+      'Gross profit = net sales minus the cost of the books sold.',
+    ],
   },
   {
-    id: 'settings',
-    title: 'Store Configuration & Staff Admin',
-    group: 'Admin',
-    path: '/settings',
-    role: 'Owner (Staff can view own details)',
-    summary: 'Manage shop metadata, tax rates, staff discount caps, and create/manage cashier and manager accounts.',
+    id: 'statement', title: 'Financial statement', group: 'Reports', path: '/statement', role: 'Manager, owner',
+    summary: 'A printable statement for any date range, one column per shop plus a total.',
+    steps: ['Pick the period and shop(s), then "Print" (choose "Save as PDF" in the print dialog for a file).'],
+    rules: ['Uses exactly the same figures as the dashboard.'],
+  },
+  {
+    id: 'expenses', title: 'Expenses', group: 'Reports', path: '/expenses', role: 'Manager, owner',
+    summary: 'Rent, wages, electricity and other running costs of the shop.',
+    steps: ['Add the date, category, amount and a note.'],
+    rules: ['Book purchases are not expenses; their cost counts when the books are sold.'],
+  },
+  {
+    id: 'settings', title: 'Settings', group: 'Admin', path: '/settings', role: 'Everyone (business settings: owner)',
+    summary: 'Your password; for the owner also shops, people and business rules.',
     steps: [
-      'Configure Shop Name and print header displayed on customer receipts.',
-      'Set Currency Symbol (e.g., ₹, $, £, €) and minor unit formatting.',
-      'Set the Default Tax Rate percentage (applied to discounted sales subtotals).',
-      'Set the Maximum Staff Discount percentage to prevent unauthorized counter markdowns.',
-      'Under User Management, add new Staff users with distinct usernames and passwords.',
-      'Reset passwords or deactivate user accounts when necessary.'
+      'Owner: add shops (name, address, phone are printed on that shop\'s bills).',
+      'Owner: add people, choose their role and which shops they work in.',
+      'Owner: tax rate, discount limits, return window and low-stock level.',
     ],
-    rules: [
-      'Server Enforced Permissions: Staff restrictions on voiding, supplier costs, purchasing, and dashboard are enforced on backend endpoints, not just hidden in the frontend.',
-      'Session Security: Authenticated sessions use HTTP cookies with secure credentials.'
-    ]
-  }
+    rules: ['Permissions are checked by the server, not only hidden on screen.'],
+  },
 ];
 
 export default function Help({ publicView = false }) {
   const location = useLocation();
-  const { isOwner } = useAuth();
   const [filter, setFilter] = useState('');
   const [highlightedId, setHighlightedId] = useState(null);
-  const sectionRefs = useRef({});
 
-  // Determine target section from query param (?section=xyz) or hash (#xyz)
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const targetSection = params.get('section') || location.hash.replace('#', '');
-    if (targetSection) {
-      setHighlightedId(targetSection);
-      const el = document.getElementById(`help-${targetSection}`);
-      if (el) {
-        setTimeout(() => {
-          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      }
-    }
+    const target = new URLSearchParams(location.search).get('section') || location.hash.replace('#', '');
+    if (!target) return;
+    setHighlightedId(target);
+    setTimeout(() => document.getElementById(`help-${target}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
   }, [location]);
 
-  const filteredSections = HELP_SECTIONS.filter((s) => {
-    if (!filter) return true;
-    const q = filter.toLowerCase();
-    return (
-      s.title.toLowerCase().includes(q) ||
-      s.group.toLowerCase().includes(q) ||
-      s.summary.toLowerCase().includes(q) ||
-      s.steps.some((st) => st.toLowerCase().includes(q)) ||
-      s.rules.some((r) => r.toLowerCase().includes(q))
-    );
-  });
-
-  const jumpTo = (id) => {
-    setHighlightedId(id);
-    const el = document.getElementById(`help-${id}`);
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
-  };
+  const q = filter.toLowerCase();
+  const sections = HELP_SECTIONS.filter((s) => !q || [s.title, s.group, s.summary, ...s.steps, ...s.rules].some((t) => t.toLowerCase().includes(q)));
 
   return (
-    <div className="max-w-[1180px] mx-auto py-2 px-1">
-      {/* Header Banner */}
-      <div className="card shadow-hard bg-sheet border-ink mb-4 p-4 animate-slide-up">
+    <div className="max-w-[1100px] mx-auto py-2 px-1">
+      <div className="card mb-4 p-4">
         <div className="flex flex-wrap items-center justify-between gap-3 pb-3 mb-3 border-b border-ink">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="badge badge-info uppercase tracking-widest text-[.72rem]">Operations Manual</span>
-              <span className="text-muted text-[.8rem]">· Reference & Functional Guidelines</span>
-            </div>
-            <h1 className="!mb-0 !border-0 text-2xl font-serif">System Help & User Guide</h1>
-          </div>
-          <div className="flex gap-2">
-            {publicView ? (
-              <Link to="/" className="btn btn-primary">← Return to Landing / Sign In</Link>
-            ) : (
-              <Link to="/landing" className="btn btn-sm">View Platform Overview</Link>
-            )}
-          </div>
+          <h1 className="!mb-0 !border-0 text-2xl font-serif">Help</h1>
+          {publicView && <Link to="/login" className="btn btn-primary">Sign in</Link>}
         </div>
-
-        <p className="text-muted text-[.92rem] max-w-3xl mb-3">
-          Comprehensive operational reference for the Bookshop Automation System. Select any feature below to inspect
-          step-by-step procedures, business rule constraints, and direct application links.
-        </p>
-
-        {/* Quick Search & Filter */}
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="text"
-            className="input max-w-[380px]"
-            placeholder="Search keywords (e.g. ISBN, void, discount, COGS, lead time)…"
-            value={filter}
-            onChange={(e) => setFilter(e.target.value)}
-          />
-          {filter && (
-            <button className="btn btn-sm" onClick={() => setFilter('')}>Clear search</button>
-          )}
-          <span className="text-muted text-[.8rem] ml-auto">
-            Showing {filteredSections.length} of {HELP_SECTIONS.length} modules
-          </span>
-        </div>
+        <input type="search" className="input max-w-[380px]" placeholder="Search help (e.g. refund, discount)" value={filter} onChange={(e) => setFilter(e.target.value)} />
       </div>
 
-      {/* Quick Navigation Shortcuts */}
-      <div className="flex flex-wrap gap-1.5 mb-4 sticky top-1 z-10 bg-paper/95 backdrop-blur-sm p-1.5 border border-ink">
-        <span className="text-[.72rem] uppercase font-bold tracking-wider text-muted self-center mr-1">Jump to:</span>
+      <div className="flex flex-wrap gap-1.5 mb-4">
         {HELP_SECTIONS.map((s) => (
-          <button
-            key={s.id}
-            onClick={() => jumpTo(s.id)}
-            className={`btn btn-sm text-[.78rem] ${highlightedId === s.id ? 'bg-ink text-paper font-bold' : ''}`}
-          >
-            {s.title}
-          </button>
+          <a key={s.id} href={`#/help?section=${s.id}`} className={`btn btn-sm text-[.78rem] no-underline ${highlightedId === s.id ? 'bg-ink text-paper font-bold' : ''}`}>{s.title}</a>
         ))}
       </div>
 
-      {/* Help Sections Container */}
       <div className="space-y-4">
-        {filteredSections.length === 0 ? (
-          <div className="empty">No matching help articles found for "{filter}".</div>
-        ) : (
-          filteredSections.map((s) => {
-            const isTarget = highlightedId === s.id;
-            return (
-              <article
-                key={s.id}
-                id={`help-${s.id}`}
-                className={`card bg-sheet border border-ink p-4 transition-all duration-300 ${isTarget ? 'help-highlighted' : 'shadow-hard-sm'}`}
-              >
-                {/* Section Header */}
-                <div className="flex flex-wrap items-start justify-between gap-3 pb-2.5 mb-3 border-b border-hair">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="badge badge-info">{s.group}</span>
-                      <span className="badge">{s.role}</span>
-                      {isTarget && <span className="badge badge-warn font-bold animate-pulse">Selected Section</span>}
-                    </div>
-                    <h2 className="!mb-0 text-xl font-serif text-ink">{s.title}</h2>
-                  </div>
-                  {!publicView && (
-                    <Link
-                      to={s.path}
-                      className="btn btn-primary btn-sm flex items-center gap-1 font-bold"
-                    >
-                      Open {s.title} in App →
-                    </Link>
-                  )}
-                </div>
-
-                {/* Summary */}
-                <p className="text-[.94rem] text-ink font-medium mb-3">
-                  {s.summary}
-                </p>
-
-                {/* Two Column Layout: Steps & Constraints */}
-                <div className="grid md:grid-cols-2 gap-4">
-                  {/* Step by Step */}
-                  <div className="p-3 bg-paper border border-hair">
-                    <h3 className="!mt-0 !mb-2 !text-[.85rem] uppercase tracking-wider text-muted !border-b-hair font-bold">
-                      Standard Workflow & Operating Steps
-                    </h3>
-                    <ol className="list-decimal list-inside space-y-1.5 text-[.88rem] text-ink">
-                      {s.steps.map((st, i) => (
-                        <li key={i} className="leading-snug">
-                          <span className="align-text-top">{st}</span>
-                        </li>
-                      ))}
-                    </ol>
-                  </div>
-
-                  {/* Rules and System Integrity */}
-                  <div className="p-3 bg-paper border border-hair">
-                    <h3 className="!mt-0 !mb-2 !text-[.85rem] uppercase tracking-wider text-muted !border-b-hair font-bold">
-                      System Rules & Integrity Safeguards
-                    </h3>
-                    <ul className="space-y-1.5 text-[.88rem] text-ink">
-                      {s.rules.map((r, i) => (
-                        <li key={i} className="leading-snug flex items-start gap-1.5">
-                          <span className="text-navy font-bold">▪</span>
-                          <span>{r}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Footer jump back */}
-                <div className="mt-3 pt-2 border-t border-hair flex justify-between items-center text-[.78rem] text-muted">
-                  <span>URL Anchor: <code className="font-mono text-ink">#/help#{s.id}</code></span>
-                  <button className="btn-link" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
-                    ↑ Top of Page
-                  </button>
-                </div>
-              </article>
-            );
-          })
-        )}
+        {sections.length === 0 ? <div className="empty">Nothing matches "{filter}".</div> : sections.map((s) => (
+          <article key={s.id} id={`help-${s.id}`} className={`card p-4 ${highlightedId === s.id ? 'help-highlighted' : ''}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3 pb-2.5 mb-3 border-b border-hair">
+              <div>
+                <div className="text-muted text-[.8rem] mb-1">{s.group} · {s.role}</div>
+                <h2 className="!mb-0 text-xl font-serif text-ink">{s.title}</h2>
+              </div>
+              {!publicView && <Link to={s.path} className="btn btn-sm">Open {s.title}</Link>}
+            </div>
+            <p className="text-[.94rem] mb-3">{s.summary}</p>
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <h3 className="!mt-0 !mb-2 !text-[.85rem] uppercase tracking-wider text-muted font-bold">How to</h3>
+                <ol className="list-decimal list-inside space-y-1.5 text-[.9rem]">{s.steps.map((t, i) => <li key={i}>{t}</li>)}</ol>
+              </div>
+              <div>
+                <h3 className="!mt-0 !mb-2 !text-[.85rem] uppercase tracking-wider text-muted font-bold">Good to know</h3>
+                <ul className="list-disc list-inside space-y-1.5 text-[.9rem]">{s.rules.map((t, i) => <li key={i}>{t}</li>)}</ul>
+              </div>
+            </div>
+          </article>
+        ))}
       </div>
     </div>
   );
 }
-

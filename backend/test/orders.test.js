@@ -17,11 +17,11 @@ test('placing an order reserves stock without deducting it; billing respects res
   assert.equal(o.body.status, 'placed');
   assert.equal(o.body.paymentStatus, 'unpaid');
   assert.equal(o.body.totalCents, 30000);
-  assert.deepEqual(t.stock(b.id), { s: 5, r: 3 });
+  assert.deepEqual((await t.stock(b.id)), { s: 5, r: 3 });
   // Only 2 are available to counter customers now.
   assert.equal((await sale(t.asStaff, [{ bookId: b.id, quantity: 3 }])).status, 409);
   assert.equal((await sale(t.asStaff, [{ bookId: b.id, quantity: 2 }])).status, 201);
-  assert.deepEqual(t.stock(b.id), { s: 3, r: 3 });
+  assert.deepEqual((await t.stock(b.id)), { s: 3, r: 3 });
   const view = (await t.asStaff.get(`/api/books/${b.id}`)).body;
   assert.equal(view.availableQty, 0);
 });
@@ -31,8 +31,8 @@ test('orders cannot reserve more than is available, and nothing is reserved on f
   const b = await t.addBook({ openingStock: 1 });
   const r = await place(t.asStaff, [{ bookId: a.id, quantity: 2 }, { bookId: b.id, quantity: 2 }]);
   assert.equal(r.status, 409);
-  assert.deepEqual(t.stock(a.id), { s: 5, r: 0 });
-  assert.equal(t.db.prepare('SELECT COUNT(*) c FROM phone_orders WHERE customer_name = ? AND total_cents = 0').get('Anita Rao').c, 0);
+  assert.deepEqual((await t.stock(a.id)), { s: 5, r: 0 });
+  assert.equal((await t.db.one('SELECT COUNT(*) AS c FROM phone_orders WHERE customer_name = $1 AND total_cents = 0', ['Anita Rao'])).c, 0);
 });
 
 test('delivery orders require an address; phone number is validated', async () => {
@@ -57,7 +57,7 @@ test('full lifecycle (pickup): place → ready → fulfil creates exactly one bi
   assert.equal(done.body.status, 'completed');
   assert.equal(done.body.paymentStatus, 'paid');
   assert.equal(done.body.paidCents, 40000);
-  assert.deepEqual(t.stock(b.id), { s: 4, r: 0 });
+  assert.deepEqual((await t.stock(b.id)), { s: 4, r: 0 });
 
   const bill = (await t.asStaff.get(`/api/sales/${done.body.saleId}`)).body;
   assert.equal(bill.totalCents, 40000);
@@ -66,8 +66,8 @@ test('full lifecycle (pickup): place → ready → fulfil creates exactly one bi
   // Double click / retry: no second bill, no second deduction, no second charge.
   const again = await t.asStaff.post(`/api/orders/${o.id}/fulfil`, { paymentMethod: 'cash' });
   assert.equal(again.status, 409);
-  assert.deepEqual(t.stock(b.id), { s: 4, r: 0 });
-  assert.equal(t.db.prepare('SELECT COUNT(*) c FROM sales WHERE order_id = ?').get(o.id).c, 1);
+  assert.deepEqual((await t.stock(b.id)), { s: 4, r: 0 });
+  assert.equal((await t.db.one('SELECT COUNT(*) AS c FROM sales WHERE order_id = $1', [o.id])).c, 1);
   assert.equal((await t.asStaff.get(`/api/orders/${o.id}`)).body.paidCents, 40000);
 });
 
@@ -77,8 +77,8 @@ test('parallel fulfil requests produce one bill', async () => {
   await t.asStaff.post(`/api/orders/${o.id}/status`, { status: 'ready' });
   const rs = await Promise.all(Array.from({ length: 5 }, () => t.asStaff.post(`/api/orders/${o.id}/fulfil`, { paymentMethod: 'cash' })));
   assert.equal(rs.filter((r) => r.status === 200).length, 1);
-  assert.equal(t.stock(b.id).s, 2);
-  assert.equal(t.db.prepare('SELECT COUNT(*) c FROM sales WHERE order_id = ?').get(o.id).c, 1);
+  assert.equal((await t.stock(b.id)).s, 2);
+  assert.equal((await t.db.one('SELECT COUNT(*) AS c FROM sales WHERE order_id = $1', [o.id])).c, 1);
 });
 
 test('delivery lifecycle: ready → out_for_delivery → fulfil; pickups cannot go out for delivery', async () => {
@@ -104,16 +104,16 @@ test('modifying an order adjusts reservations, keeps agreed prices, and recalcul
   assert.equal(m.body.items.find((i) => i.bookId === a.id).unitPriceCents, 10000); // old agreed price kept
   assert.equal(m.body.items.find((i) => i.bookId === b.id).unitPriceCents, 5000);
   assert.equal(m.body.totalCents, 35000);
-  assert.deepEqual(t.stock(a.id), { s: 5, r: 3 });
-  assert.deepEqual(t.stock(b.id), { s: 5, r: 1 });
+  assert.deepEqual((await t.stock(a.id)), { s: 5, r: 3 });
+  assert.deepEqual((await t.stock(b.id)), { s: 5, r: 1 });
   // reduce: removing a book releases its reservation
   const m2 = await t.asStaff.put(`/api/orders/${o.id}`, { ...cust, deliveryType: 'pickup', items: [{ bookId: b.id, quantity: 1 }] });
   assert.equal(m2.status, 200);
-  assert.deepEqual(t.stock(a.id), { s: 5, r: 0 });
+  assert.deepEqual((await t.stock(a.id)), { s: 5, r: 0 });
   // growing beyond availability fails and leaves reservations as they were
   const big = await t.asStaff.put(`/api/orders/${o.id}`, { ...cust, deliveryType: 'pickup', items: [{ bookId: b.id, quantity: 9 }] });
   assert.equal(big.status, 409);
-  assert.deepEqual(t.stock(b.id), { s: 5, r: 1 });
+  assert.deepEqual((await t.stock(b.id)), { s: 5, r: 1 });
 });
 
 test('cancelling releases the reservation once; cancelled/completed orders cannot be changed', async () => {
@@ -122,13 +122,13 @@ test('cancelling releases the reservation once; cancelled/completed orders canno
   assert.equal((await t.asStaff.post(`/api/orders/${o.id}/cancel`, {})).status, 400); // reason required
   const c = await t.asStaff.post(`/api/orders/${o.id}/cancel`, { reason: 'Customer changed mind' });
   assert.equal(c.body.status, 'cancelled');
-  assert.deepEqual(t.stock(b.id), { s: 4, r: 0 });
+  assert.deepEqual((await t.stock(b.id)), { s: 4, r: 0 });
   assert.equal((await t.asStaff.post(`/api/orders/${o.id}/cancel`, { reason: 'again' })).status, 409);
-  assert.deepEqual(t.stock(b.id), { s: 4, r: 0 });
+  assert.deepEqual((await t.stock(b.id)), { s: 4, r: 0 });
   assert.equal((await t.asStaff.put(`/api/orders/${o.id}`, { ...cust, deliveryType: 'pickup', items: [{ bookId: b.id, quantity: 1 }] })).status, 409);
   assert.equal((await t.asStaff.post(`/api/orders/${o.id}/status`, { status: 'ready' })).status, 409);
   assert.equal((await t.asStaff.post(`/api/orders/${o.id}/fulfil`, { paymentMethod: 'cash' })).status, 409);
-  assert.equal(t.stock(b.id).s, 4);
+  assert.equal((await t.stock(b.id)).s, 4);
 });
 
 test('a completed order cannot be cancelled or have its bill voided (no double reversal)', async () => {
@@ -138,7 +138,7 @@ test('a completed order cannot be cancelled or have its bill voided (no double r
   const done = (await t.asStaff.post(`/api/orders/${o.id}/fulfil`, { paymentMethod: 'cash' })).body;
   assert.equal((await t.asStaff.post(`/api/orders/${o.id}/cancel`, { reason: 'late' })).status, 409);
   assert.equal((await t.asOwner.post(`/api/sales/${done.saleId}/void`, { reason: 'x' })).status, 409);
-  assert.equal(t.stock(b.id).s, 1);
+  assert.equal((await t.stock(b.id)).s, 1);
 });
 
 test('payment status is independent of fulfilment: pay in parts, no overpayment, refund after cancel', async () => {
@@ -148,7 +148,7 @@ test('payment status is independent of fulfilment: pay in parts, no overpayment,
   let r = await t.asStaff.post(`/api/orders/${o.id}/payments`, { amountCents: 5000, method: 'cash' });
   assert.equal(r.body.paymentStatus, 'partial');
   assert.equal(r.body.status, 'placed'); // fulfilment unaffected
-  assert.equal((await t.asStaff.post(`/api/orders/${o.id}/payments`, { amountCents: 15001, method: 'cash' })).status, 400);
+  assert.equal((await t.asStaff.post(`/api/orders/${o.id}/payments`, { amountCents: 15100, method: 'cash' })).status, 400); // 1 rupee too much
   r = await t.asStaff.post(`/api/orders/${o.id}/payments`, { amountCents: 15000, method: 'card' });
   assert.equal(r.body.paymentStatus, 'paid');
   assert.equal(r.body.balanceCents, 0);
@@ -167,7 +167,7 @@ test('an order cannot be reduced below what has already been paid without refund
   const o = (await place(t.asStaff, [{ bookId: b.id, quantity: 3 }], { advancePayment: { amountCents: 25000, method: 'cash' } })).body;
   const m = await t.asStaff.put(`/api/orders/${o.id}`, { ...cust, deliveryType: 'pickup', items: [{ bookId: b.id, quantity: 1 }] });
   assert.equal(m.status, 409);
-  assert.deepEqual(t.stock(b.id), { s: 5, r: 3 }); // rolled back
+  assert.deepEqual((await t.stock(b.id)), { s: 5, r: 3 }); // rolled back
   await t.asStaff.post(`/api/orders/${o.id}/refund`, { method: 'cash', amountCents: 20000 });
   assert.equal((await t.asStaff.put(`/api/orders/${o.id}`, { ...cust, deliveryType: 'pickup', items: [{ bookId: b.id, quantity: 1 }] })).status, 200);
 });
@@ -176,7 +176,7 @@ test('advance payment larger than the total is rejected and the order is not cre
   const b = await t.addBook({ openingStock: 5, priceCents: 1000 });
   const r = await place(t.asStaff, [{ bookId: b.id, quantity: 1 }], { advancePayment: { amountCents: 5000, method: 'cash' } });
   assert.equal(r.status, 400);
-  assert.deepEqual(t.stock(b.id), { s: 5, r: 0 });
+  assert.deepEqual((await t.stock(b.id)), { s: 5, r: 0 });
 });
 
 test('a book with reserved copies cannot be retired; list filters work', async () => {

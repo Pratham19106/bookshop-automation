@@ -11,14 +11,19 @@ function percentToBp(value, field = 'percent') {
   return bp;
 }
 
-// Single place where bill arithmetic lives (used by billing and phone orders).
-// lines: [{ unitPriceCents, quantity }]. Discount applies to the subtotal, tax to the discounted amount.
+// Amounts are stored in paise but are always whole rupees (no paise anywhere): round to the nearest rupee.
+const RUPEE = 100;
+const roundRupee = (cents) => Math.round(cents / RUPEE) * RUPEE;
+
+// Single place where bill arithmetic lives (used by billing, phone orders and adjustment bills).
+// lines: [{ unitPriceCents, quantity }]. Discount applies to the subtotal, tax to the discounted amount;
+// both are rounded to the nearest rupee, so every total is a whole number of rupees.
 function computeTotals(lines, discountBp, taxBp) {
-  const subtotal = lines.reduce((s, l) => s + l.unitPriceCents * l.quantity, 0);
-  const discount = Math.round((subtotal * discountBp) / 10000);
+  const subtotal = lines.reduce((s, l) => s + roundRupee(l.unitPriceCents) * l.quantity, 0);
+  const discount = roundRupee((subtotal * discountBp) / 10000);
   const taxable = subtotal - discount;
-  const tax = Math.round((taxable * taxBp) / 10000);
+  const tax = roundRupee((taxable * taxBp) / 10000);
   return { subtotalCents: subtotal, discountCents: discount, taxCents: tax, totalCents: taxable + tax };
 }
 
-module.exports = { percentToBp, computeTotals };
+module.exports = { percentToBp, computeTotals, roundRupee, RUPEE };

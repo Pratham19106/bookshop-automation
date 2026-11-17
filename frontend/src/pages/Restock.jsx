@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { get, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { bookName, fmt } from '../lib/format';
-import { useLoad } from '../lib/hooks';
+import { useCached } from '../lib/hooks';
 import { toast } from '../lib/overlays';
 import { Async, Badge, Empty, PageTitle } from '../lib/ui';
 import { AlertTriangle } from 'lucide-react';
@@ -14,7 +14,7 @@ export default function Restock() {
   const [p, setP] = useState({ lookbackDays: settings.restockLookbackDays || 30, coverDays: settings.restockCoverDays || 21 });
   const [applied, setApplied] = useState(p);
   const [picked, setPicked] = useState({}); // index -> quantity
-  const st = useLoad(() => get(`/restock${qs(applied)}`), [applied]);
+  const st = useCached(['inventory', 'restock', applied], () => get(`/restock${qs(applied)}`));
 
   const createPo = (items) => {
     const chosen = Object.entries(picked).map(([i, quantity]) => ({ r: items[Number(i)], quantity }));
@@ -29,13 +29,7 @@ export default function Restock() {
 
   return (
     <div>
-      <PageTitle
-        actions={
-          <span className="bg-[#F3E8FF] text-[#6D28D9] font-mono text-xs font-bold px-2.5 py-1 border border-[#6D28D9] shadow-[2px_2px_0px_0px_#6D28D9]">
-            05 · Velocity Engine
-          </span>
-        }
-      >
+      <PageTitle>
         Restocking Recommendations
       </PageTitle>
       <p className="text-muted mb-2">Rule-based and fully explained: each suggestion shows the sales and stock figures behind it. Nothing is ordered automatically.</p>

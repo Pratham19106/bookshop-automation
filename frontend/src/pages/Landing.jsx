@@ -24,7 +24,7 @@ export default function Landing() {
       badgeColor: 'bg-emerald-500 text-white',
       shadowColor: 'neo-shadow-emerald',
       tag: 'Atomic Checkout',
-      summary: 'Barcode scanning, instant ISBN matching, role-capped discounts, and BEGIN IMMEDIATE atomic database commits.',
+      summary: 'Barcode scanning, instant ISBN matching, role-capped discounts, and transactional checkout.',
       path: '/help?section=billing'
     },
     {
@@ -130,7 +130,7 @@ export default function Landing() {
               <BookOpen className="w-4 h-4 text-[#4F46E5]" /> Help Manual
             </Link>
             {user ? (
-              <Link to="/dashboard" className="px-4 py-1.5 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black font-mono font-bold hover:bg-[#CCFF00] hover:text-black transition-all ml-1 shadow-[2px_2px_0px_0px_#1A1A1A]">
+              <Link to={user.role === 'staff' ? '/billing' : '/dashboard'} className="px-4 py-1.5 bg-[#1A1A1A] text-[#CCFF00] border-2 border-black font-mono font-bold hover:bg-[#CCFF00] hover:text-black transition-all ml-1 shadow-[2px_2px_0px_0px_#1A1A1A]">
                 Launch Terminal ({user.username}) →
               </Link>
             ) : (

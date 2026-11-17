@@ -1,13 +1,12 @@
 import React from 'react';
 import { useAuth } from '../lib/auth';
 import { fmt } from '../lib/format';
-import { Printer, Download, ExternalLink } from 'lucide-react';
+import { Printer } from 'lucide-react';
 
+// Whole rupees only (amounts are rounded to the nearest rupee; no paise column).
 function splitCents(cents) {
-  const c = Math.max(0, cents || 0);
-  const rs = Math.floor(c / 100);
-  const ps = String(c % 100).padStart(2, '0');
-  return { rs, ps };
+  const rs = Math.round(Math.max(0, cents || 0) / 100).toLocaleString('en-IN');
+  return { rs };
 }
 
 function formatDate(iso) {
@@ -19,32 +18,44 @@ function formatDate(iso) {
   return `${dd}-${mm}-${yyyy}`;
 }
 
-export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showActions = true }) {
+export default function PhysicalCashMemo({ bill, adjustment = null, onPrint, showActions = true }) {
   const { settings } = useAuth();
 
+  if (adjustment) bill = adjustment;
   if (!bill) return null;
+  const isAdjustment = !!adjustment;
 
-  const shopName = (settings?.shopName || 'PRATHAM BOOKSHOP').toUpperCase();
-  const shopAddress = settings?.shopAddress || 'Main Road, 12 College Road, Mumbai - 400 001';
-  const shopPhone = 'Ph : 040-6455 5452 / +91 98200 11111';
-  const paymentMethod = (bill.paymentMethod || 'cash').toLowerCase();
-  const billType = `${paymentMethod.toUpperCase()} - BILL`;
+  // Header comes from the shop the bill was made in (sent with the bill); settings only as a fallback.
+  const shopName = (bill.shopName || settings?.shopName || '').toUpperCase();
+  const shopAddress = bill.shopAddress ?? settings?.shopAddress ?? '';
+  const shopPhone = bill.shopPhone ?? settings?.shopPhone ?? '';
+  const paymentMethod = (bill.paymentMethod || (isAdjustment ? '' : 'cash')).toLowerCase();
+  const billType = isAdjustment ? `${bill.type.toUpperCase()} - ADJUSTMENT BILL` : `${paymentMethod.toUpperCase()} - BILL`;
   const dateFormatted = formatDate(bill.createdAt);
-  const customerName = bill.customerName || 'Walk-in Customer';
-  const billNumber = bill.billNo || `INV-${String(bill.id || 1).padStart(6, '0')}`;
+  const customerName = bill.customerName || '';
+  const billNumber = isAdjustment ? bill.adjustmentNo : bill.billNo;
+  const returnDays = bill.returnWindowDays ?? settings?.returnWindowDays;
 
   const items = bill.items || [];
-  const total = splitCents(bill.totalCents);
+  const adjustmentTax = isAdjustment ? items.reduce((sum, item) => sum + item.sign * item.taxCents, 0) : 0;
+  const total = splitCents(isAdjustment ? Math.abs(bill.netCents) : bill.totalCents);
   const subtotal = splitCents(bill.subtotalCents);
-  const discount = bill.discountCents > 0 ? splitCents(bill.discountCents) : null;
-  const tax = bill.taxCents > 0 ? splitCents(bill.taxCents) : null;
+  const discount = !isAdjustment && bill.discountCents > 0 ? splitCents(bill.discountCents) : null;
+  const tax = isAdjustment ? (adjustmentTax ? splitCents(Math.abs(adjustmentTax)) : null) : (bill.taxCents > 0 ? splitCents(bill.taxCents) : null);
 
   // Rubber stamp styling configuration
   let stampLabel = 'CASH PAID';
   let stampSub = 'OFFICIAL RECEIPT';
   let stampColorClass = 'border-[#2b3a8c] text-[#2b3a8c] bg-[#2b3a8c]/5 shadow-[0_0_0_2px_#2b3a8c]';
 
-  if (paymentMethod === 'upi') {
+  if (isAdjustment) {
+    stampLabel = bill.netCents < 0 ? 'REFUNDED' : bill.netCents > 0 ? 'COLLECTED' : 'EVEN';
+    stampSub = paymentMethod ? paymentMethod.toUpperCase() : 'NO PAYMENT';
+  } else if (bill.status === 'voided') {
+    stampLabel = 'VOID';
+    stampSub = 'CANCELLED';
+    stampColorClass = 'border-[#BE123C] text-[#BE123C] bg-[#BE123C]/5 shadow-[0_0_0_2px_#BE123C]';
+  } else if (paymentMethod === 'upi') {
     stampLabel = 'UPI PAID';
     stampSub = 'DIGITAL PAYMENT';
     stampColorClass = 'border-[#0c7356] text-[#0c7356] bg-[#0c7356]/5 shadow-[0_0_0_2px_#0c7356]';
@@ -61,30 +72,6 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
   // Ensure minimum rows to preserve authentic printed pad proportion
   const padRowsCount = Math.max(0, 4 - items.length);
 
-  const handleDownloadPdf = async () => {
-    if (onDownloadPdf) {
-      onDownloadPdf();
-      return;
-    }
-    try {
-      const res = await fetch(`/api/sales/${bill.id}/pdf`, {
-        headers: { 'X-Requested-With': 'bookshop' }
-      });
-      if (!res.ok) throw new Error('PDF generation failed');
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `CashMemo-${billNumber}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
-    } catch {
-      window.open(`/api/sales/${bill.id}/pdf`, '_blank');
-    }
-  };
-
   const handlePrint = () => {
     if (onPrint) onPrint();
     else window.print();
@@ -96,7 +83,7 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
       {showActions && (
         <div className="print:hidden w-full max-w-[760px] mb-3 flex flex-wrap items-center justify-between gap-2 p-2 bg-amber-50/80 border border-ochre rounded">
           <div className="flex items-center gap-2">
-            <span className="badge badge-ok font-bold text-xs">Finalized</span>
+            {bill.status === 'voided' ? <span className="badge badge-bad font-bold text-xs">Voided</span> : <span className="badge badge-ok font-bold text-xs">Saved</span>}
             <span className="text-xs font-mono font-bold text-ink">Bill No: {billNumber}</span>
           </div>
           <div className="flex items-center gap-2">
@@ -104,30 +91,11 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
               type="button"
               className="btn btn-sm btn-primary flex items-center gap-1.5"
               onClick={handlePrint}
-              title="Print Cash Memo (Ctrl+P)"
+              title="Print, or choose Save as PDF in the print dialog"
             >
               <Printer className="w-4 h-4" />
-              <span>Print Memo</span>
+              <span>Print / Save PDF</span>
             </button>
-            <button
-              type="button"
-              className="btn btn-sm flex items-center gap-1.5 border-ink hover:bg-tint"
-              onClick={handleDownloadPdf}
-              title="Download Authentic PDF generated with Puppeteer"
-            >
-              <Download className="w-4 h-4" />
-              <span>Download PDF</span>
-            </button>
-            <a
-              href={`/api/sales/${bill.id}/html`}
-              target="_blank"
-              rel="noreferrer"
-              className="btn btn-sm flex items-center gap-1"
-              title="Open standalone printable bill in new window"
-            >
-              <span>Standalone Tab</span>
-              <ExternalLink className="w-3.5 h-3.5" />
-            </a>
           </div>
         </div>
       )}
@@ -140,7 +108,7 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
         {/* Top Header Bar */}
         <div className="flex items-center justify-between font-bold text-[13px] text-red-700 tracking-wider mb-2 border-b border-red-200 pb-1">
           <span className="uppercase">{billType}</span>
-          <span className="font-mono text-xs">{shopPhone}</span>
+          {shopPhone && <span className="font-mono text-xs">Ph: {shopPhone}</span>}
         </div>
 
         {/* Store Title & Emblem */}
@@ -153,12 +121,7 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
               {shopName}
             </h1>
           </div>
-          <div className="text-xs font-semibold text-gray-700 mt-1.5">
-            {shopAddress}
-          </div>
-          <div className="text-[11px] font-bold text-red-700 uppercase tracking-wide mt-1">
-            DISTRIBUTORS : ALL TYPES OF BOOK &amp; STATIONERY · ACADEMIC &amp; LITERATURE
-          </div>
+          {shopAddress && <div className="text-xs font-semibold text-gray-700 mt-1.5">{shopAddress}</div>}
         </div>
 
         {/* Metadata Section with Classic Dotted Underlines */}
@@ -184,13 +147,7 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
               {customerName}
             </span>
           </div>
-
-          <div className="flex items-baseline mt-2">
-            <span className="font-bold text-gray-800 whitespace-nowrap mr-2">Address :</span>
-            <span className="text-gray-700 flex-1 border-b border-dotted border-gray-600 px-2 text-xs italic">
-              Counter Sale / Direct Purchase
-            </span>
-          </div>
+          {isAdjustment && <div className="mt-2 flex flex-wrap justify-between gap-2 text-xs font-mono"><span><strong>Against invoice:</strong> {bill.billNo}</span><span><strong>Staff:</strong> {bill.staff || '—'}</span></div>}
         </div>
 
         {/* Ledger Table with Red Borders */}
@@ -202,28 +159,22 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
                 <th className="py-1.5 px-3 border-r border-red-700 text-left">PARTICULARS</th>
                 <th className="w-14 py-1.5 px-1 border-r border-red-700 text-center">QTY.</th>
                 <th className="w-20 py-1.5 px-2 border-r border-red-700 text-right">RATE</th>
-                <th colSpan={2} className="w-28 py-1 px-1 text-center">
-                  Amount<br/>
-                  <div className="flex justify-between px-2 text-[10px] font-normal border-t border-red-200">
-                    <span>Rs.</span>
-                    <span>Ps.</span>
-                  </div>
-                </th>
+                <th className="w-28 py-1.5 px-2 text-right">AMOUNT (Rs.)</th>
               </tr>
             </thead>
             <tbody>
               {items.map((it, idx) => {
                 const rate = splitCents(it.unitPriceCents || 0);
-                const line = splitCents(it.lineTotalCents || (it.quantity * it.unitPriceCents) || 0);
+                const line = splitCents(it.lineTotalCents ?? ((it.quantity * it.unitPriceCents) || 0));
                 return (
-                  <tr key={it.bookId || idx} className="border-b border-red-100">
+                  <tr key={it.id || it.bookId || idx} className="border-b border-red-100">
                     <td className="border-r border-red-700 text-center py-2 px-1 align-top">
                       <span className="inline-block w-5 h-5 rounded-full border border-gray-800 text-[11px] font-bold leading-[18px]">
                         {idx + 1}
                       </span>
                     </td>
                     <td className="border-r border-red-700 py-2 px-3 align-top">
-                      <div className="font-bold text-gray-900 leading-snug">{it.title}</div>
+                      <div className="font-bold text-gray-900 leading-snug">{isAdjustment && <span>{it.sign < 0 ? 'RETURN: ' : 'REPLACEMENT: '}</span>}{it.title}</div>
                       <div className="text-[11px] text-gray-600 font-mono mt-0.5">
                         {it.author ? `${it.author}` : ''}
                         {it.isbn ? ` · ISBN ${it.isbn}` : ''}
@@ -236,11 +187,8 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
                     <td className="border-r border-red-700 text-right font-mono font-bold py-2 px-2 align-top text-gray-800">
                       {rate.rs}
                     </td>
-                    <td className="border-r border-red-200 text-right font-mono font-black py-2 px-2 align-top text-gray-900 w-20">
-                      {line.rs}
-                    </td>
-                    <td className="text-center font-mono font-black py-2 px-1 align-top text-gray-700 w-8">
-                      {line.ps}
+                    <td className="text-right font-mono font-black py-2 px-2 align-top text-gray-900">
+                      {isAdjustment ? (it.sign < 0 ? '−' : '+') : ''}{line.rs}
                     </td>
                   </tr>
                 );
@@ -253,7 +201,6 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
                   <td className="border-r border-red-700"></td>
                   <td className="border-r border-red-700"></td>
                   <td className="border-r border-red-700"></td>
-                  <td className="border-r border-red-200"></td>
                   <td></td>
                 </tr>
               ))}
@@ -264,11 +211,8 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
                   <td colSpan={4} className="border-r border-red-700 py-1 px-3 text-right">
                     Discount ({bill.discountPercent}%):
                   </td>
-                  <td className="border-r border-red-200 text-right font-mono font-bold py-1 px-2 text-brick">
+                  <td className="text-right font-mono font-bold py-1 px-2 text-brick">
                     -{discount.rs}
-                  </td>
-                  <td className="text-center font-mono font-bold py-1 px-1 text-brick">
-                    {discount.ps}
                   </td>
                 </tr>
               )}
@@ -277,13 +221,10 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
               {tax && (
                 <tr className="border-t border-red-700 bg-red-50/20 text-xs font-semibold">
                   <td colSpan={4} className="border-r border-red-700 py-1 px-3 text-right">
-                    Tax ({bill.taxPercent}%):
+                    {isAdjustment ? 'Net tax:' : `Tax (${bill.taxPercent}%):`}
                   </td>
-                  <td className="border-r border-red-200 text-right font-mono font-bold py-1 px-2 text-gray-800">
-                    {tax.rs}
-                  </td>
-                  <td className="text-center font-mono font-bold py-1 px-1 text-gray-700">
-                    {tax.ps}
+                  <td className="text-right font-mono font-bold py-1 px-2 text-gray-800">
+                    {isAdjustment && adjustmentTax < 0 ? '−' : ''}{tax.rs}
                   </td>
                 </tr>
               )}
@@ -291,13 +232,10 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
               {/* TOTAL Row (Contains required 'TOTAL' keyword) */}
               <tr className="border-t-2 border-red-700 bg-red-50/60 font-black text-red-800">
                 <td colSpan={4} className="border-r border-red-700 py-2 px-3 text-right tracking-wider text-sm font-serif">
-                  TOTAL
+                  {isAdjustment ? (bill.netCents < 0 ? 'TOTAL TO REFUND' : bill.netCents > 0 ? 'TOTAL TO COLLECT' : 'EVEN EXCHANGE') : 'TOTAL'}
                 </td>
-                <td className="border-r border-red-200 text-right font-mono text-base font-black py-2 px-2 text-red-900">
-                  {total.rs}
-                </td>
-                <td className="text-center font-mono text-base font-black py-2 px-1 text-red-900">
-                  {total.ps}
+                <td className="text-right font-mono text-base font-black py-2 px-2 text-red-900">
+                  {isAdjustment && bill.netCents < 0 ? '−' : ''}{total.rs}
                 </td>
               </tr>
             </tbody>
@@ -320,7 +258,7 @@ export default function PhysicalCashMemo({ bill, onPrint, onDownloadPdf, showAct
         {/* Footer with Disclaimer & Signature Block */}
         <div className="flex items-end justify-between mt-4 pt-2 text-xs">
           <div className="text-red-700 font-semibold italic text-xs">
-            goods once sold will not taken back.
+            {isAdjustment ? <>{paymentMethod ? `Settlement: ${paymentMethod.toUpperCase()}` : 'No payment needed'}{bill.reason && <div>Reason: {bill.reason}</div>}</> : (returnDays > 0 ? `Returns and exchanges within ${returnDays} days with this bill.` : 'Goods once sold are not taken back.')}
           </div>
           <div className="text-right">
             <div className="font-extrabold text-red-700 uppercase text-xs">

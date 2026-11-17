@@ -1,66 +1,73 @@
 # Architecture
 
 ```
-frontend/ (React SPA, built to dist/)  --HTTP/JSON-->  backend/src/app.js (routes, auth, errors)
-                                                            |
-                                                    backend/src/services/*  (all business rules, transactions)
-                                                            |
-                                                    SQLite (backend/data/bookshop.db, migrations in src/db/migrations)
+frontend/ (React SPA)  --HTTP/JSON + X-Shop-Id-->  backend/src/app.js (session auth, tenant context, role guards, routes)
+                                                         |
+                                                 backend/src/services/*  (business rules; every query scoped by business / shop)
+                                                         |
+                                                 Supabase Postgres (schema in supabase/migrations, RLS on, no public access)
 ```
+
+## Live updates
+
+After every successful change the API publishes a small event (`sale`, `return`, `orders`, `books`, `stock`, ...) to
+`GET /api/events` (Server-Sent Events). Each browser keeps one stream open while signed in and receives only events of
+its own business and shops. `frontend/src/lib/queryClient.js` maps each event to the cached screens it affects
+(TanStack Query) and only those reload. After a reconnect everything is refreshed once. Mapping of routes to events:
+`backend/src/lib/hub.js`.
+
+## Tenancy model
+
+- A **business** (one owner, or several) has **shops**. Each request carries `X-Shop-Id`; `app.js` builds
+  `req.ctx = { db, user, businessId, shopIds, shopId, tz }` and refuses a shop the user may not use.
+- Shared by all shops of a business: titles (`books`, with the selling price), suppliers and their quotes, settings.
+- Per shop: stock (`shop_stock`: on hand, reserved, weighted-average cost, threshold, aisle/rack/shelf), stock ledger,
+  bills, phone orders, purchase orders, goods receipts, expenses, and the running numbers (`INV-S01-000042`).
+- Global and read-only: `catalog_books`, the ISBN reference catalogue used to add titles.
+- Composite foreign keys `(business_id, shop_id)` / `(business_id, book_id)` make cross-tenant rows impossible even if code had a bug.
+
+## Roles
+
+`owner > manager > staff`. Owners see every shop; managers and staff only the shops in `user_shops`. Route guards in `app.js`
+(`authed`, `role('manager')`, `role('owner')`); cost data is omitted for staff; discount ceilings per role in `lib/tenant.js`.
 
 ## Backend layout
 
 | Path | Purpose |
 |---|---|
-| `src/app.js` | Express app: security headers, CSRF header check, session auth, role guards, routes, error mapping, serves `frontend/dist` |
-| `src/services/` | `books`, `inventory`, `sales`, `orders`, `suppliers`, `purchasing`, `restock`, `dashboard`, `expenses`, `users`, `settings` |
-| `src/lib/` | `validate` (input checks, ISBN), `money` (percent/bp and the single bill-arithmetic function), `dates`, `errors` |
-| `src/db/` | connection and `tx()` helper, migration runner, `migrations/*.sql`, demo seed |
-| `test/` | node:test suites (auth, catalogue, billing, orders, purchasing, reports) |
-| `e2e/smoke.js` | 10-second headless-browser smoke test (puppeteer-core) |
-
-Routes contain no business logic; they validate the session/role and call one service function. Billing and phone-order fulfilment both call `recordSale`,
-so totals, snapshots and stock rules live in exactly one place.
-
-## Frontend layout
-
-React 18 + React Router (hash routes) + Tailwind CSS 3, built with Vite. In development Vite serves the app on :5173 and proxies `/api` to the API on :3000.
-In production the API serves the built `frontend/dist` itself (one origin, so the session cookie stays same-site).
-
-| Path | Purpose |
-|---|---|
-| `src/App.jsx` | sidebar + header shell and route table; owner-only pages are not routed at all for staff |
-| `src/pages/` | one file per screen: Billing, Bills, Catalogue, Inventory, Orders, Restock, Suppliers, Purchases, Dashboard, Expenses, Settings, Receipt, Login |
-| `src/lib/` | `api.js` (fetch wrapper), `ui.jsx` (Modal, Button, BookPicker, Badge...), `overlays.jsx` (toasts, confirm), `auth.jsx`, `format.js`, `hooks.js` |
-| `tailwind.config.js`, `src/index.css` | design tokens and shared component classes |
-
-Design ("Editorial Artisanal"): warm off-white paper with charcoal ink; accents taken from physical materials (sage, terracotta, slate); Playfair Display for headlines and
-book titles, Inter (tabular numerals) for all data; fine 1px rules separate sections instead of boxes; tables are ruled ledgers; a faint SVG grain overlays the page.
-No glass, blur or neon. Fonts are bundled (no external requests). React escapes all rendered text, so catalogue data cannot inject markup.
-
-- **Book covers** (`lib/cover.jsx`): there is no cover art in the data, so each book gets a stable generated cover (colour and layout derived from title and author) drawn as a physical
-  object, with spine shading, a page-edge highlight and a layered contact shadow. Swapping in real cover images later means changing only this component.
-- **Motion** (`lib/motion.jsx`, Framer Motion): slow fades with a few pixels of drift, staggered list loads, and the dashboard sales line that draws itself. No springs or bounce, and
-  `MotionConfig reducedMotion="user"` disables movement for people who request reduced motion.
+| `src/app.js` | Express app: security headers, CSRF header check, session → tenant context, role guards, routes, Postgres error mapping |
+| `src/services/` | `books`, `catalog`, `inventory`, `sales`, `orders`, `suppliers`, `purchasing`, `restock`, `dashboard`, `expenses`, `users` (auth, people, shops, sign-up), `settings`, `billPrinter` |
+| `src/lib/` | `validate`, `money` (the single bill-arithmetic function), `dates`, `errors`, `tenant` (roles, discount ceilings), `counters` (per-shop numbering) |
+| `src/db/` | `pg` pool + `tx()` helper, migration runner, demo seed |
+| `scripts/` | `import-catalog`, `create-owner`, `backup` |
+| `test/` | node:test suites, each in its own throwaway Postgres schema |
+| `e2e/smoke.js` | headless-browser smoke test |
 
 ## Data integrity decisions
 
 - Money is integer minor units; percentages are basis points; the only bill arithmetic is `computeTotals`.
-- Every write path runs inside `db.transaction(...).immediate()` (SQLite `BEGIN IMMEDIATE`), so concurrent writers, even from separate processes, are serialised and any thrown error rolls back all of it.
-- Stock changes go through `applyStock` (guarded UPDATE + `stock_movements` ledger) with `CHECK` constraints as the last line of defence.
-- Uniqueness constraints carry the business rules: ISBN, `sales.order_id` (one bill per order), `sales.idempotency_key`, `goods_receipts.idempotency_key`.
-- Sales, receipts and orders never delete history; reversals are new records (void, refund, adjustment).
+- Every write path runs in one transaction (`db.tx`). Stock changes go through `applyStock`: a guarded `UPDATE ... WHERE stock + delta >= reserved`
+  (atomic in Postgres, so concurrent sales can never oversell) plus a `stock_movements` ledger row; `CHECK` constraints are the last line of defence.
+- Orders, bills and purchase orders being changed are locked with `SELECT ... FOR UPDATE`; stock rows are touched in book-id order to avoid deadlocks.
+- Bill / order / PO numbers come from `shop_counters` (row-locked upsert), never `MAX(id)+1`.
+- Uniqueness carries business rules: ISBN per business, one bill per phone order, idempotency keys per shop.
+- Sales, receipts and orders never delete history; reversals are new records (void, refund, exchange, adjustment).
 
 ## Security
 
-Passwords are bcrypt-hashed; sessions are random 256-bit tokens stored hashed, sent in an `HttpOnly; SameSite=Strict` cookie. Mutating requests must carry `X-Requested-With`.
-All SQL is parameterised; LIKE wildcards are escaped. A CSP restricts scripts to the app's own origin.
-Supplier prices, cost, purchasing, dashboard and expenses are guarded by an owner check on the server and cost fields are omitted from staff responses.
+Passwords are bcrypt-hashed; sessions are random 256-bit tokens stored hashed, sent in an `HttpOnly; SameSite=Strict` cookie.
+Mutating requests must carry `X-Requested-With`. All SQL is parameterised. The browser never talks to the database: the frontend
+has no Supabase keys, and RLS without policies blocks the public API keys entirely.
 
 ## Key workflows
 
-**Sale:** validate -> (idempotency check) -> load books, check available = stock - reserved -> `recordSale` (bill, snapshot items, deduct stock, ledger) -> commit.
+**Sale:** validate → idempotency check → load titles with this shop's stock, check available = stock − reserved → `recordSale`
+(bill number, snapshot items, deduct stock, ledger) → commit.
 
-**Phone order:** place (reserve) -> ready -> [out for delivery] -> fulfil: collect any balance, create the bill, deduct stock and release the reservation, mark completed. One transaction.
+**Phone order:** place (reserve in this shop) → ready → [out for delivery] → fulfil: collect any balance, create the bill, deduct
+stock and release the reservation, mark completed. One transaction.
 
-**Purchasing:** create PO (cost defaults to supplier quote) -> receive (per-line quantities <= outstanding) -> stock up, weighted-average cost, supplier price updated, PO status updated.
+**Purchasing:** create PO for a shop (cost defaults to the supplier quote) → receive (≤ outstanding) → that shop's stock up,
+weighted-average cost, supplier price updated, PO status updated.
+
+**Adding a title:** search the ISBN catalogue → pick → title, publisher, format and category are copied; the manager sets the price and opening stock.

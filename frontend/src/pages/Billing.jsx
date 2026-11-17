@@ -3,12 +3,12 @@ import { Link } from 'react-router-dom';
 import { get, post } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { BookCover } from '../lib/cover';
-import { fmt, uuid } from '../lib/format';
+import { billTotals, fmt, roundRupee, uuid } from '../lib/format';
 import { confirmBox, fail, toast } from '../lib/overlays';
 import { Actions, BookPicker, Button, Field, Modal, PageTitle } from '../lib/ui';
 import PhysicalCashMemo from '../components/PhysicalCashMemo';
 import { FolderArchive, CheckCircle2 } from 'lucide-react';
-import { broadcastEvent } from '../lib/supabase';
+import { broadcastEvent, subscribeToActivity } from '../lib/events';
 
 const STORAGE_KEY_ACTIVE = 'bookshop_active_bill';
 const STORAGE_KEY_DRAFTS = 'bookshop_bill_drafts';
@@ -34,7 +34,7 @@ function loadStoredDrafts() {
 }
 
 export default function Billing() {
-  const { isOwner, settings } = useAuth();
+  const { isOwner, settings, maxDiscountPercent } = useAuth();
 
   // Load initial persistent state if available
   const initialActive = loadStoredActive();
@@ -83,11 +83,9 @@ export default function Billing() {
     return () => window.removeEventListener('storage', onStorage);
   }, []);
 
-  const maxDisc = isOwner ? 100 : settings.staffMaxDiscountPercent;
-  const sub = cart.reduce((s, l) => s + l.book.priceCents * l.quantity, 0);
-  const disc = Math.round((sub * Math.round((Number(discount) || 0) * 100)) / 10000);
-  const tax = Math.round(((sub - disc) * Math.round(settings.taxPercent * 100)) / 10000);
-  const total = sub - disc + tax;
+  const maxDisc = maxDiscountPercent;
+  // Whole rupees, same rounding as the server.
+  const { sub, disc, tax, total } = billTotals(cart.reduce((s, l) => s + roundRupee(l.book.priceCents) * l.quantity, 0), discount, settings.taxPercent);
 
   const add = (book) => {
     if (book.availableQty <= 0) toast(`“${book.title}” is out of stock`, 'bad');
@@ -113,6 +111,24 @@ export default function Billing() {
     setCart(updated);
     return updated;
   };
+
+  // Live: when stock moves anywhere (another counter, a phone order, a delivery), re-check the books in this cart
+  // so "available" is current before finalising.
+  const cartRef = useRef(cart);
+  cartRef.current = cart;
+  useEffect(() => {
+    let timer = null;
+    const unsub = subscribeToActivity(({ event }) => {
+      if (!['sale', 'return', 'void', 'orders', 'books', 'stock'].includes(event) || !cartRef.current.length) return;
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const current = cartRef.current;
+        const fresh = await Promise.all(current.map((l) => get(`/books/${l.book.id}`).catch(() => null)));
+        setCart((c) => c.map((l) => { const f = fresh.find((b) => b && b.id === l.book.id); return f ? { ...l, book: f } : l; }));
+      }, 300);
+    });
+    return () => { clearTimeout(timer); unsub(); };
+  }, []);
 
   // Hold / Save current bill as a draft
   const saveAsDraft = () => {
@@ -223,9 +239,6 @@ export default function Billing() {
       <PageTitle
         actions={
           <div className="flex items-center gap-2">
-            <span className="bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold px-2.5 py-1 border border-[#15803D] shadow-[2px_2px_0px_0px_#15803D] hidden sm:inline-block">
-              01 · POS Counter
-            </span>
             {drafts.length > 0 && (
               <button
                 type="button"
@@ -235,7 +248,7 @@ export default function Billing() {
                 onClick={() => setShowDraftsList(!showDraftsList)}
               >
                 <FolderArchive className="w-4 h-4" />
-                <span>Parked Drafts ({drafts.length})</span>
+                <span>Parked bills ({drafts.length})</span>
                 <span>{showDraftsList ? '▲' : '▼'}</span>
               </button>
             )}
@@ -246,7 +259,7 @@ export default function Billing() {
                 onClick={saveAsDraft}
                 title="Save this bill as draft and clear the counter for another customer"
               >
-                Hold / Save Draft
+                Hold
               </button>
             )}
           </div>
@@ -260,8 +273,7 @@ export default function Billing() {
         <section className="bg-[#FEFCE8] border-2 border-black mb-4 p-3.5 shadow-[4px_4px_0px_0px_#B45309] animate-slide-up">
           <div className="flex items-center justify-between pb-2 mb-2.5 border-b-2 border-black">
             <div className="flex items-center gap-2">
-              <span className="badge badge-warn font-bold">Multi-Customer Queue</span>
-              <strong className="text-sm font-serif font-black text-black">Parked Bill Drafts ({drafts.length})</strong>
+              <strong className="text-sm font-serif font-black text-black">Parked bills ({drafts.length})</strong>
             </div>
             <span className="text-[.75rem] text-[#4B5563] font-mono">
               Click "Resume" to load a draft back into the counter register.
@@ -305,7 +317,7 @@ export default function Billing() {
                     className="btn btn-sm btn-primary text-xs font-bold"
                     onClick={() => resumeDraft(d.id)}
                   >
-                    Resume Draft →
+                    Resume
                   </button>
                 </div>
               </div>
@@ -319,7 +331,6 @@ export default function Billing() {
         <section className="card">
           <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-black">
             <h2 className="!mb-0">Find a book</h2>
-            <span className="badge badge-info">Barcode / ISBN Search</span>
           </div>
           <BookPicker onPick={add} autoFocus />
           <p className="text-muted text-xs font-mono mt-2.5">
@@ -332,11 +343,6 @@ export default function Billing() {
           <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-black">
             <div className="flex items-center gap-2">
               <h2 className="!mb-0">Current bill</h2>
-              {cart.length > 0 && (
-                <span className="bg-[#CCFF00] text-black font-mono font-bold text-[.68rem] px-2 py-0.5 border border-black shadow-[1px_1px_0px_0px_#1A1A1A] tracking-wider" title="Active cart is saved locally in real-time">
-                  ● Auto-Saved
-                </span>
-              )}
             </div>
             {drafts.length > 0 && !showDraftsList && (
               <button
@@ -527,7 +533,7 @@ export default function Billing() {
                   onClick={saveAsDraft}
                   title="Park this bill into saved drafts and clear the counter for another customer"
                 >
-                  Hold / Save Draft
+                  Hold
                 </Button>
                 <Button variant="primary" id="finalize" onClick={finalize}>
                   Finalize sale

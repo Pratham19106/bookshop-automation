@@ -1,10 +1,8 @@
-const { tx } = require('../db');
 const v = require('../lib/validate');
 const { conflict, notFound, badRequest } = require('../lib/errors');
+const { canSeeCost, requireShop } = require('../lib/tenant');
 const { getSettings } = require('./settings');
-const { applyStock } = require('./inventory');
-
-const likeEscape = (s) => s.replace(/[\\%_]/g, '\\$&');
+const { BOOK_SELECT, loadBook, applyStock, likeEscape } = require('./inventory');
 
 function locationText(b) {
   const parts = [];
@@ -14,7 +12,7 @@ function locationText(b) {
   return parts.join(' · ');
 }
 
-// Map a DB row to the API shape. Cost is owner-only (it reflects supplier pricing).
+// Map a book-with-shop-stock row to the API shape. Cost is hidden from staff (it reflects supplier pricing).
 function toApi(row, { includeCost, defaultThreshold }) {
   const threshold = row.low_stock_threshold ?? defaultThreshold;
   const available = row.stock_qty - row.reserved_qty;
@@ -36,154 +34,178 @@ function toApi(row, { includeCost, defaultThreshold }) {
     aisle: row.aisle,
     rack: row.rack,
     shelf: row.shelf,
-    location: locationText(row),
-    active: !!row.active,
+    location: row.location || '',
+    active: row.active,
   };
   if (includeCost) out.costCents = row.cost_cents;
   return out;
 }
 
-const ctx = (db, user) => ({ includeCost: user.role === 'owner', defaultThreshold: getSettings(db).defaultLowStockThreshold });
+async function view(ctx) {
+  return { includeCost: canSeeCost(ctx), defaultThreshold: (await getSettings(ctx.db, ctx.businessId)).defaultLowStockThreshold };
+}
 
-function search(db, user, { q = '', genre = '', lowOnly = false, includeInactive = false, limit = 50, offset = 0 } = {}) {
+async function search(ctx, { q = '', genre = '', lowOnly = false, includeInactive = false, limit = 50, offset = 0 } = {}) {
   const tokens = String(q).trim().split(/\s+/).filter(Boolean).slice(0, 8);
+  const vw = await view(ctx);
+  const params = [ctx.businessId, requireShop(ctx)];
+  const p = (val) => { params.push(val); return `$${params.length}`; };
   const where = [];
-  const params = {};
-  tokens.forEach((t, i) => {
-    const digits = t.replace(/-/g, '');
-    params[`t${i}`] = `%${likeEscape(t)}%`;
-    params[`d${i}`] = `%${likeEscape(digits)}%`;
-    where.push(`(title LIKE @t${i} ESCAPE '\\' OR author LIKE @t${i} ESCAPE '\\' OR publisher LIKE @t${i} ESCAPE '\\'
-                 OR genre LIKE @t${i} ESCAPE '\\' OR edition LIKE @t${i} ESCAPE '\\' OR isbn LIKE @d${i} ESCAPE '\\')`);
-  });
-  if (!includeInactive) where.push('active = 1');
-  if (genre) { where.push('genre = @genre COLLATE NOCASE'); params.genre = genre; }
-  const { defaultLowStockThreshold } = getSettings(db);
-  if (lowOnly) { where.push('stock_qty - reserved_qty <= COALESCE(low_stock_threshold, @def)'); params.def = defaultLowStockThreshold; }
-  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
-  // Rank exact ISBN, then title prefix, then the rest alphabetically.
+  for (const t of tokens) {
+    const like = p(`%${likeEscape(t)}%`);
+    const digits = p(`%${likeEscape(t.replace(/-/g, ''))}%`);
+    where.push(`(b.title ILIKE ${like} OR b.author ILIKE ${like} OR b.publisher ILIKE ${like}
+                 OR b.genre ILIKE ${like} OR b.edition ILIKE ${like} OR b.isbn ILIKE ${digits})`);
+  }
+  if (!includeInactive) where.push('b.active');
+  if (genre) where.push(`lower(b.genre) = lower(${p(String(genre))})`);
+  if (lowOnly) {
+    where.push(`COALESCE(ss.stock_qty, 0) - COALESCE(ss.reserved_qty, 0) <= COALESCE(ss.low_stock_threshold, ${p(vw.defaultThreshold)})`);
+  }
+  const whereSql = where.length ? `AND ${where.join(' AND ')}` : '';
   const first = String(q).trim();
-  params.exactIsbn = first.replace(/[\s-]/g, '').toUpperCase();
-  params.prefix = `${likeEscape(first)}%`;
+  const exact = p(first.replace(/[\s-]/g, '').toUpperCase());
+  const prefix = p(`${likeEscape(first)}%`);
   const lim = Math.min(Math.max(Number(limit) || 50, 1), 200);
   const off = Math.max(Number(offset) || 0, 0);
-  const total = db.prepare(`SELECT COUNT(*) c FROM books ${whereSql}`).get(params).c;
-  const rows = db.prepare(`SELECT * FROM books ${whereSql}
-                           ORDER BY (isbn = @exactIsbn) DESC, (title LIKE @prefix ESCAPE '\\') DESC, title COLLATE NOCASE, edition
-                           LIMIT ${lim} OFFSET ${off}`).all(params);
-  const c = ctx(db, user);
-  return { total, items: rows.map((r) => toApi(r, c)) };
+  const total = (await ctx.db.one(`SELECT COUNT(*) AS c FROM books b LEFT JOIN shop_stock ss ON ss.book_id = b.id AND ss.shop_id = $2
+                                    WHERE b.business_id = $1 ${whereSql}`, params.slice(0, params.length - 2))).c;
+  const rows = await ctx.db.many(`${BOOK_SELECT} ${whereSql}
+     ORDER BY (b.isbn = ${exact}) DESC NULLS LAST, (b.title ILIKE ${prefix}) DESC, lower(b.title), b.edition
+     LIMIT ${lim} OFFSET ${off}`, params);
+  return { total, items: rows.map((r) => toApi(r, vw)) };
 }
 
-function get(db, user, id) {
-  const row = db.prepare('SELECT * FROM books WHERE id = ?').get(id);
-  if (!row) throw notFound('Book');
-  return toApi(row, ctx(db, user));
+async function get(ctx, id, q = ctx.db) {
+  return toApi(await loadBook(q, ctx, id), await view(ctx));
 }
 
-function genres(db) {
-  return db.prepare("SELECT DISTINCT genre FROM books WHERE genre <> '' ORDER BY genre COLLATE NOCASE").all().map((r) => r.genre);
+async function genres(ctx) {
+  return (await ctx.db.many(`SELECT DISTINCT genre FROM books WHERE business_id = $1 AND genre <> '' ORDER BY genre`, [ctx.businessId]))
+    .map((r) => r.genre);
 }
 
 function parseFields(input) {
   v.object(input);
   return {
     title: v.str(input.title, 'title', { required: true, max: 300 }),
-    author: v.str(input.author, 'author', { required: true, max: 200 }),
+    author: v.str(input.author, 'author', { max: 200 }),
     isbn: v.isbn(input.isbn),
     publisher: v.str(input.publisher, 'publisher', { max: 200 }),
     edition: v.str(input.edition, 'edition', { max: 100 }),
     genre: v.str(input.genre, 'genre', { max: 100 }),
-    price_cents: v.int(input.priceCents, 'priceCents', { min: 0, max: 1e9 }),
-    low_stock_threshold: v.int(input.lowStockThreshold, 'lowStockThreshold', { min: 0, max: 100000, required: false }),
-    aisle: v.str(input.aisle, 'aisle', { max: 30 }),
-    rack: v.str(input.rack, 'rack', { max: 30 }),
-    shelf: v.str(input.shelf, 'shelf', { max: 30 }),
+    price_cents: v.money(input.priceCents, 'priceCents', { min: 0, max: 1e9 }),
   };
 }
 
-function duplicateError(db, f, excludeId) {
-  let other;
+// Shop-level fields (threshold, location) are optional on create / update and apply to the active shop.
+function parseShopFields(input) {
+  const out = {};
+  if (input.lowStockThreshold !== undefined) out.low_stock_threshold = v.int(input.lowStockThreshold, 'lowStockThreshold', { min: 0, max: 100000, required: false });
+  return out;
+}
+
+async function duplicateError(q, ctx, f, excludeId = -1) {
   if (f.isbn) {
-    other = db.prepare('SELECT * FROM books WHERE isbn = ? AND id <> ?').get(f.isbn, excludeId ?? -1);
+    const other = await q.one('SELECT id, title, edition FROM books WHERE business_id = $1 AND isbn = $2 AND id <> $3', [ctx.businessId, f.isbn, excludeId]);
     if (other) return conflict(`ISBN ${f.isbn} already belongs to "${other.title}"${other.edition ? ` (${other.edition})` : ''}`, { bookId: other.id });
   } else {
-    other = db.prepare(`SELECT * FROM books WHERE isbn IS NULL AND lower(title)=lower(?) AND lower(author)=lower(?)
-                        AND lower(edition)=lower(?) AND lower(publisher)=lower(?) AND id <> ?`)
-      .get(f.title, f.author, f.edition, f.publisher, excludeId ?? -1);
-    if (other) return conflict(`"${other.title}" by ${other.author} with the same edition and publisher already exists (no ISBN). Add an ISBN or a different edition to tell them apart.`, { bookId: other.id });
+    const other = await q.one(`SELECT id, title, author FROM books WHERE business_id = $1 AND isbn IS NULL AND lower(title) = lower($2)
+                                 AND lower(author) = lower($3) AND lower(edition) = lower($4) AND lower(publisher) = lower($5) AND id <> $6`,
+    [ctx.businessId, f.title, f.author, f.edition, f.publisher, excludeId]);
+    if (other) return conflict(`"${other.title}"${other.author ? ` by ${other.author}` : ''} with the same edition and publisher already exists (no ISBN). Add an ISBN or a different edition to tell them apart.`, { bookId: other.id });
   }
   return null;
 }
 
-function create(db, user, input) {
+async function writeShopFields(q, ctx, bookId, sf) {
+  const cols = Object.keys(sf);
+  if (!cols.length) return;
+  await q.query(`INSERT INTO shop_stock(business_id, shop_id, book_id) VALUES ($1, $2, $3) ON CONFLICT (shop_id, book_id) DO NOTHING`,
+    [ctx.businessId, requireShop(ctx), bookId]);
+  await q.query(`UPDATE shop_stock SET ${cols.map((c, i) => `${c} = $${i + 3}`).join(', ')}, updated_at = now() WHERE shop_id = $1 AND book_id = $2`,
+    [ctx.shopId, bookId, ...cols.map((c) => sf[c])]);
+}
+
+async function create(ctx, input) {
   const f = parseFields(input);
+  const sf = parseShopFields(input);
   const opening = v.int(input.openingStock, 'openingStock', { min: 0, max: 1e7, required: false }) ?? 0;
-  return tx(db, () => {
-    const dup = duplicateError(db, f);
+  requireShop(ctx);
+  return ctx.db.tx(async (q) => {
+    const dup = await duplicateError(q, ctx, f);
     if (dup) throw dup;
-    const r = db.prepare(`INSERT INTO books(title, author, isbn, publisher, edition, genre, price_cents, low_stock_threshold, aisle, rack, shelf)
-                          VALUES (@title, @author, @isbn, @publisher, @edition, @genre, @price_cents, @low_stock_threshold, @aisle, @rack, @shelf)`).run(f);
-    const id = Number(r.lastInsertRowid);
-    if (opening > 0) applyStock(db, { bookId: id, stockDelta: opening, reason: 'opening', note: 'Opening stock', userId: user.id });
-    return get(db, user, id);
+    const { id } = await q.one(`INSERT INTO books(business_id, title, author, isbn, publisher, edition, genre, price_cents)
+                                VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+    [ctx.businessId, f.title, f.author, f.isbn, f.publisher, f.edition, f.genre, f.price_cents]);
+    await writeShopFields(q, ctx, id, sf);
+    if (opening > 0) await applyStock(q, ctx, { bookId: id, stockDelta: opening, reason: 'opening', note: 'Opening stock' });
+    return get(ctx, id, q);
   });
 }
 
-function update(db, user, id, input) {
+// Add a title from the global ISBN catalogue: bibliographic data is copied, the shop supplies price and stock.
+async function createFromCatalog(ctx, input) {
+  v.object(input);
+  const isbn = v.isbn(input.isbn);
+  if (!isbn) throw badRequest('isbn is required');
+  const cat = await ctx.db.one('SELECT * FROM catalog_books WHERE isbn = $1', [isbn]);
+  if (!cat) throw notFound(`ISBN ${isbn} in the catalogue`);
+  return create(ctx, {
+    ...input,
+    isbn,
+    title: input.title || cat.title,
+    publisher: input.publisher ?? cat.publisher,
+    genre: input.genre ?? cat.category,
+    edition: input.edition ?? cat.format,
+  });
+}
+
+async function update(ctx, id, input) {
   const f = parseFields(input);
-  return tx(db, () => {
-    if (!db.prepare('SELECT 1 FROM books WHERE id = ?').get(id)) throw notFound('Book');
-    const dup = duplicateError(db, f, id);
+  const sf = parseShopFields(input);
+  return ctx.db.tx(async (q) => {
+    if (!(await q.one('SELECT 1 FROM books WHERE business_id = $1 AND id = $2', [ctx.businessId, id]))) throw notFound('Book');
+    const dup = await duplicateError(q, ctx, f, id);
     if (dup) throw dup;
-    db.prepare(`UPDATE books SET title=@title, author=@author, isbn=@isbn, publisher=@publisher, edition=@edition, genre=@genre,
-                price_cents=@price_cents, low_stock_threshold=@low_stock_threshold, aisle=@aisle, rack=@rack, shelf=@shelf,
-                updated_at=@now WHERE id=@id`).run({ ...f, id, now: new Date().toISOString() });
-    return get(db, user, id);
+    await q.query(`UPDATE books SET title = $3, author = $4, isbn = $5, publisher = $6, edition = $7, genre = $8, price_cents = $9, updated_at = now()
+                    WHERE business_id = $1 AND id = $2`,
+    [ctx.businessId, id, f.title, f.author, f.isbn, f.publisher, f.edition, f.genre, f.price_cents]);
+    await writeShopFields(q, ctx, id, sf);
+    return get(ctx, id, q);
   });
 }
 
-// Retire/restore a title. Retired books disappear from billing/search but keep their history.
-function setActive(db, user, id, active) {
-  return tx(db, () => {
-    const book = db.prepare('SELECT * FROM books WHERE id = ?').get(id);
+// Retire / restore a title (business-wide). Retired books disappear from billing / search but keep their history.
+async function setActive(ctx, id, active) {
+  return ctx.db.tx(async (q) => {
+    const book = await q.one('SELECT id FROM books WHERE business_id = $1 AND id = $2', [ctx.businessId, id]);
     if (!book) throw notFound('Book');
-    if (!active && book.reserved_qty > 0) throw conflict(`${book.reserved_qty} cop${book.reserved_qty === 1 ? 'y is' : 'ies are'} reserved for open phone orders; complete or cancel them first`);
-    db.prepare('UPDATE books SET active = ?, updated_at = ? WHERE id = ?').run(active ? 1 : 0, new Date().toISOString(), id);
-    return get(db, user, id);
-  });
-}
-
-// Fast shelf relocation / batch placement for the Floor & Shelves designer
-function setLocation(db, user, id, input) {
-  v.object(input);
-  const aisle = v.str(input.aisle, 'aisle', { max: 30, required: false }) || '';
-  const rack = v.str(input.rack, 'rack', { max: 30, required: false }) || '';
-  const shelf = v.str(input.shelf, 'shelf', { max: 30, required: false }) || '';
-  return tx(db, () => {
-    const book = db.prepare('SELECT id FROM books WHERE id = ?').get(id);
-    if (!book) throw notFound('Book');
-    db.prepare('UPDATE books SET aisle = ?, rack = ?, shelf = ?, updated_at = ? WHERE id = ?')
-      .run(aisle, rack, shelf, new Date().toISOString(), id);
-    return get(db, user, id);
-  });
-}
-
-function batchAssignLocation(db, user, input) {
-  v.object(input);
-  const aisle = v.str(input.aisle, 'aisle', { max: 30, required: false }) || '';
-  const rack = v.str(input.rack, 'rack', { max: 30, required: false }) || '';
-  const shelf = v.str(input.shelf, 'shelf', { max: 30, required: false }) || '';
-  const bookIds = v.array(input.bookIds, 'bookIds', { min: 1, max: 1000 });
-  return tx(db, () => {
-    const stmt = db.prepare('UPDATE books SET aisle = ?, rack = ?, shelf = ?, updated_at = ? WHERE id = ?');
-    const now = new Date().toISOString();
-    for (const rawId of bookIds) {
-      const id = v.int(rawId, 'bookId', { min: 1 });
-      stmt.run(aisle, rack, shelf, now, id);
+    if (!active) {
+      const { r } = await q.one('SELECT COALESCE(SUM(reserved_qty), 0) AS r FROM shop_stock WHERE book_id = $1', [id]);
+      if (r > 0) throw conflict(`${r} cop${r === 1 ? 'y is' : 'ies are'} reserved for open phone orders; complete or cancel them first`);
     }
-    return { ok: true, count: bookIds.length, aisle, rack, shelf };
+    await q.query('UPDATE books SET active = $2, updated_at = now() WHERE id = $1', [id, !!active]);
+    return get(ctx, id, q);
   });
 }
 
-module.exports = { search, get, genres, create, update, setActive, locationText, setLocation, batchAssignLocation };
+function parseLocation(input) {
+  v.object(input);
+  return {
+    aisle: v.str(input.aisle, 'aisle', { max: 30 }) || '',
+    rack: v.str(input.rack, 'rack', { max: 30 }) || '',
+    shelf: v.str(input.shelf, 'shelf', { max: 30 }) || '',
+  };
+}
+
+// Shelf placement in the active shop (Floor & Shelves designer).
+async function setLocation(ctx, id, input) {
+  throw conflict('Use Books to Arrange to confirm shelf placement');
+}
+
+async function batchAssignLocation(ctx, input) {
+  throw conflict('Use Books to Arrange to confirm shelf placement');
+}
+
+module.exports = { search, get, genres, create, createFromCatalog, update, setActive, locationText, setLocation, batchAssignLocation, toApi };

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { del, get, post, put, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { bookName, fmt, fmtDate, money, parseMoney } from '../lib/format';
-import { useDebounced, useLoad } from '../lib/hooks';
+import { useCached, useDebounced } from '../lib/hooks';
 import { toast } from '../lib/overlays';
 import { Actions, Async, Badge, BookPicker, Button, Empty, Field, Modal, PageTitle, useAction } from '../lib/ui';
 
@@ -40,13 +40,13 @@ function PriceDialog({ title, label, initial, onSave, onClose }) {
     <Modal title={title} onClose={onClose}>
       <Field label={`${label} (${settings.currencySymbol})`} htmlFor="c"><input id="c" className="input font-mono" inputMode="decimal" value={v} onChange={(e) => setV(e.target.value)} autoFocus /></Field>
       <Actions><Button onClick={onClose}>Cancel</Button>
-        <Button variant="primary" onClick={async () => { const c = parseMoney(v); if (c === null) throw new Error('Enter a price like 120 or 120.50'); await onSave(c); toast('Quote saved'); onClose(); }}>Save</Button></Actions>
+        <Button variant="primary" onClick={async () => { const c = parseMoney(v); if (c === null) throw new Error('Enter a price in rupees, like 120'); await onSave(c); toast('Quote saved'); onClose(); }}>Save</Button></Actions>
     </Modal>
   );
 }
 
 function SupplierDetail({ id, onClose, onChange }) {
-  const st = useLoad(() => get(`/suppliers/${id}`), [id]);
+  const st = useCached(['purchasing', 'supplier', id], () => get(`/suppliers/${id}`));
   const [sub, setSub] = useState(null); // 'edit' | { book } for new quote | { edit: row }
   const s = st.data;
   const refresh = () => { st.reload(); onChange?.(); };
@@ -106,15 +106,12 @@ export default function Suppliers() {
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(false);
   const dq = useDebounced(q);
-  const st = useLoad(() => get(`/suppliers${qs({ q: dq, inactive })}`), [dq, inactive]);
+  const st = useCached(['purchasing', 'suppliers', dq, inactive], () => get(`/suppliers${qs({ q: dq, inactive })}`));
   return (
     <div>
       <PageTitle
         actions={
           <div className="flex items-center gap-2">
-            <span className="bg-[#FFE4E6] text-[#BE123C] font-mono text-xs font-bold px-2.5 py-1 border border-[#BE123C] shadow-[2px_2px_0px_0px_#BE123C] hidden sm:inline-block">
-              06 · Supply Chain
-            </span>
             <button className="btn btn-primary" onClick={() => setAdding(true)}>
               + Add supplier
             </button>

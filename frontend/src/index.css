@@ -284,3 +284,32 @@
   0% { opacity: 0; }
   100% { opacity: 1; }
 }
+
+/* Phones (below Tailwind's sm breakpoint). Tables keep their own sideways scroll inside .table-wrap; the page
+   itself never scrolls sideways. */
+html, body { overflow-x: clip; }
+@media (max-width: 639px) {
+  .card { padding: 0.85rem; }
+  .toolbar { padding: 0.75rem; gap: 0.6rem; }
+  .toolbar > div { flex: 1 1 140px; min-width: 0; }          /* fields two to a row, search full width when long */
+  .toolbar > div.flex-1, .toolbar > div.grow { flex-basis: 100%; }
+  .toolbar .input { min-width: 0; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.6rem; }
+  .tile { padding: 0.75rem; }
+  .tile-v { font-size: 1.4rem; line-height: 1.75rem; word-break: break-word; }
+  .sum { max-width: none; }
+  .kv { column-gap: 0.75rem; }
+  .kv dd { min-width: 0; overflow-wrap: anywhere; }
+  .ledger td, .ledger th { padding: 0.5rem 0.6rem; }
+  select, input:not([type="checkbox"]):not([type="radio"]), textarea { font-size: 16px !important; } /* stops iPhone zooming in on focus */
+  dialog { max-width: 100vw; margin-top: auto; margin-bottom: auto; }
+}
+
+/* Printed bills and statements: A4, keep colours, no app chrome. */
+@media print {
+  @page { size: A4; margin: 12mm; }
+  html, body { background: #fff !important; }
+  * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .statement-paper table { font-size: 11px; }
+  .statement-paper tr { break-inside: avoid; }
+}

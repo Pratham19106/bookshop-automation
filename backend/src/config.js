@@ -1,13 +1,18 @@
+const fs = require('node:fs');
 const path = require('node:path');
-const os = require('node:os');
 
 const root = path.join(__dirname, '..');
-const isServerless = Boolean(process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME || process.env.LAMBDA_TASK_ROOT);
+
+// Local development: read backend/.env if present (Node 22 built-in). Hosted platforms inject real env vars.
+const envFile = path.join(root, '.env');
+if (fs.existsSync(envFile)) process.loadEnvFile(envFile);
 
 module.exports = {
   port: Number(process.env.PORT) || 3000,
-  dbPath: process.env.DB_PATH || (isServerless ? path.join(os.tmpdir(), 'bookshop.db') : path.join(root, 'data', 'bookshop.db')),
-  // Minutes east of UTC used to bucket sales into local calendar days (dashboard, daily reports).
+  // Supabase Postgres connection string (Project Settings -> Database -> Connection string).
+  databaseUrl: process.env.DATABASE_URL || '',
+  testDatabaseUrl: process.env.TEST_DATABASE_URL || process.env.DATABASE_URL || '',
+  // Minutes east of UTC used to bucket sales into local calendar days (dashboard, daily reports). India = 330.
   tzOffsetMinutes: process.env.TZ_OFFSET_MINUTES !== undefined
     ? Number(process.env.TZ_OFFSET_MINUTES)
     : -new Date().getTimezoneOffset(),

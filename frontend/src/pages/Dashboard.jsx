@@ -1,40 +1,30 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { get, qs } from '../lib/api';
 import { BookCover } from '../lib/cover';
 import { bookName, daysAgo, fmt, fmtDate, today } from '../lib/format';
-import { useLoad } from '../lib/hooks';
+import { useCached } from '../lib/hooks';
 import { EASE, Reveal, Stagger, StaggerItem } from '../lib/motion';
 import { Async, Badge, Empty, PageTitle, Tile, tone } from '../lib/ui';
-import { subscribeToActivity, supabase } from '../lib/supabase';
-import { Zap } from 'lucide-react';
 
 // Net sales over time. The line draws itself in (slowly), then the area beneath it fades up.
 function Bars({ series }) {
   if (!series.length) return <Empty>No sales in this period.</Empty>;
-  const W = 600; const H = 190; const PAD = { l: 8, r: 8, t: 14, b: 8 };
-  const max = Math.max(...series.map((s) => s.netSalesCents), 1);
-  const x = (i) => PAD.l + (series.length === 1 ? (W - PAD.l - PAD.r) / 2 : (i * (W - PAD.l - PAD.r)) / (series.length - 1));
-  const y = (v) => PAD.t + (1 - v / max) * (H - PAD.t - PAD.b);
-  const pts = series.map((s, i) => [x(i), y(s.netSalesCents)]);
-  const line = pts.map(([px, py], i) => `${i ? 'L' : 'M'}${px.toFixed(1)},${py.toFixed(1)}`).join(' ');
-  const area = `${line} L${pts[pts.length - 1][0].toFixed(1)},${H - PAD.b} L${pts[0][0].toFixed(1)},${H - PAD.b} Z`;
+  const max = Math.max(...series.map((s) => Math.abs(s.netSalesCents)), 1);
   return (
     <>
-      <div className="flex items-end gap-1 h-[160px] pt-2 border-b-2 border-black" role="img" aria-label="Net sales per period">
+      <div className="flex gap-1 h-[160px] pt-2" role="img" aria-label="Net sales per period: positive values above the centre line, negative values below">
         {series.map((s) => (
-          <div
-            key={s.bucket}
-            className="flex-1 min-w-[3px] bg-[#1A1A1A] hover:bg-[#CCFF00] hover:border-black transition-colors border-t border-x border-black"
-            style={{ height: `${Math.max(3, (s.netSalesCents / max) * 100)}%` }}
-            title={`${s.bucket}: ${fmt(s.netSalesCents)} (${s.bills} bills)`}
-          />
+          <div key={s.bucket} className="flex-1 min-w-[3px] flex flex-col" title={`${s.bucket}: ${fmt(s.netSalesCents)} (${s.bills} bills)`}>
+            <div className="h-1/2 flex items-end border-b border-black">{s.netSalesCents > 0 && <div className="w-full bg-[#1A1A1A]" style={{ height: `${Math.max(3, (s.netSalesCents / max) * 100)}%` }} />}</div>
+            <div className="h-1/2">{s.netSalesCents < 0 && <div className="w-full bg-[#BE123C]" style={{ height: `${Math.max(3, (-s.netSalesCents / max) * 100)}%` }} />}</div>
+          </div>
         ))}
       </div>
       <div className="flex justify-between text-muted text-xs font-mono mt-1 font-bold">
         <span>{series[0].bucket}</span>
-        <span className="text-[#15803D]">peak {fmt(max)}</span>
+        <span>Maximum movement {fmt(max)}</span>
         <span>{series[series.length - 1].bucket}</span>
       </div>
     </>
@@ -92,55 +82,29 @@ function Showcase({ books }) {
 }
 
 export default function Dashboard() {
-  const [f, setF] = useState({ from: daysAgo(29), to: today(), group: 'day' });
-  const st = useLoad(() => get(`/dashboard${qs(f)}`), [f]);
+  const outlets = useCached(['admin', 'shops'], () => get('/shops'));
+  const [f, setF] = useState({ from: daysAgo(29), to: today(), group: 'day', outlet: 'all' });
+  // Live: any sale, return, purchase or expense in any of these shops refreshes the figures (lib/queryClient.js).
+  const st = useCached(['dashboard', 'main', f], () => get(`/dashboard${qs(f)}`));
   const range = (n) => setF((x) => ({ ...x, from: daysAgo(n), to: today() }));
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
-
-  // Realtime updates: reload financial metrics automatically when sales, returns, or void events occur
-  useEffect(() => {
-    const unsub = subscribeToActivity(({ event }) => {
-      if (['sale', 'return', 'void'].includes(event)) {
-        st.reload();
-      }
-    });
-
-    let pgChannel = null;
-    try {
-      if (supabase) {
-        pgChannel = supabase.channel('dashboard-pg-sales')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
-            st.reload();
-          })
-          .subscribe();
-      }
-    } catch {}
-
-    return () => {
-      unsub();
-      if (pgChannel && supabase) supabase.removeChannel(pgChannel);
-    };
-  }, [st.reload]);
 
   return (
     <div>
       <PageTitle
         actions={
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ECFDF5] text-[#059669] border border-[#059669] text-xs font-mono font-bold shadow-[2px_2px_0px_0px_#059669]">
-              <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping" />
-              Realtime Engine
-            </span>
-            <span className="bg-[#DBEAFE] text-[#1D4ED8] font-mono text-xs font-bold px-2.5 py-1 border border-[#1D4ED8] shadow-[2px_2px_0px_0px_#1D4ED8]">
-              07 · Financial Engine
-            </span>
-          </div>
+          null
         }
       >
         Dashboard
       </PageTitle>
 
       <div className="toolbar">
+        <Link className="btn" to="/sales-report">Outlet sales &amp; complete report →</Link>
+        <div><label htmlFor="dashboard-outlet">Shop</label><select id="dashboard-outlet" className="input" value={f.outlet} onChange={set('outlet')}>
+          <option value="all">All my shops</option>
+          {(outlets.data || []).map((outlet) => <option key={outlet.id} value={outlet.id}>{outlet.name}</option>)}
+        </select></div>
         <div>
           <label htmlFor="from">From</label>
           <input id="from" type="date" className="input font-mono" value={f.from} onChange={set('from')} />
@@ -197,16 +161,24 @@ export default function Dashboard() {
                 <Tile k="Net sales (revenue)" v={fmt(s.netSalesCents)} s={`${s.bills} bills · ${s.unitsSold} units · after ${fmt(s.discountCents)} discounts, before tax`} />
                 <Tile k="Cost of goods sold" v={fmt(s.cogsCents)} s="cost of the books actually sold" />
                 <Tile k="Gross profit" v={fmt(s.grossProfitCents)} s={s.netSalesCents ? `${((s.grossProfitCents / s.netSalesCents) * 100).toFixed(1)}% margin` : ''} tone={tone(s.grossProfitCents)} />
-                <Tile k="Operating expenses" v={fmt(s.operatingExpensesCents)} s="rent, wages, utilities…" />
-                <Tile k="Operating profit" v={fmt(s.operatingProfitCents)} s="gross profit − operating expenses" tone={tone(s.operatingProfitCents)} />
-                <Tile k="Stock purchases" v={fmt(s.purchaseSpendCents)} s="value of goods received from suppliers" />
                 <Tile k="Tax collected" v={fmt(s.taxCents)} s="passed on, not revenue" />
-                <Tile k="Net cash movement" v={fmt(s.netCashMovementCents)} s="sales + tax − purchases − expenses" tone={tone(s.netCashMovementCents)} />
               </div>
 
-              <p className="text-muted text-xs mb-4 font-mono">
-                ℹ Revenue, purchases, cost of goods sold and profit are different measures: buying stock is not an expense of the period until the books are sold (it then appears as cost of goods sold).
-              </p>
+              <div className="tiles">
+                <Tile k="Purchases received" v={fmt(s.purchaseSpendCents)} s="stock bought in this period" />
+                <Tile k="Operating expenses" v={fmt(s.operatingExpensesCents)} s="rent, wages, utilities…" />
+                <Tile k="Operating profit" v={fmt(s.operatingProfitCents)} s="gross profit − expenses" tone={tone(s.operatingProfitCents)} />
+              </div>
+
+              {d.byShop.length > 1 && (
+                <section className="card mb-4">
+                  <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-black">
+                    <h2 className="!mb-0">Net sales by shop</h2>
+                    <span className="badge badge-info">{d.byShop.length} shops</span>
+                  </div>
+                  <HBars rows={d.byShop} name={(x) => `${x.name} (${x.code})`} value={(x) => x.netSalesCents} />
+                </section>
+              )}
 
               <div className="grid lg:grid-cols-2 gap-4">
                 <section className="card">
@@ -220,12 +192,11 @@ export default function Dashboard() {
                 <section className="card">
                   <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-black">
                     <h2 className="!mb-0">Best-selling titles</h2>
-                    <span className="badge badge-ok">Top Velocity</span>
                   </div>
                   <HBars rows={d.bestSellers} name={bookName} value={(b) => b.units} format={(n) => `${n} sold`} />
                 </section>
 
-                <section className="card">
+                {!d.salesOnly && <><section className="card">
                   <div className="flex items-center justify-between pb-2 mb-3 border-b-2 border-black">
                     <h2 className="!mb-0">Stock purchases by supplier</h2>
                     <span className="badge badge-warn">Spend</span>
@@ -304,14 +275,14 @@ export default function Dashboard() {
                       )}
                     </>
                   )}
-                </section>
+                </section></>}
               </div>
 
-              <div className="tiles mt-4">
+              {!d.salesOnly && <div className="tiles mt-4">
                 <Tile k="Open phone orders" v={d.openPhoneOrders.count} s={`${fmt(d.openPhoneOrders.valueCents)} to be billed`} />
                 <Tile k="Open purchase orders" v={d.openPurchaseOrders} s="awaiting delivery" />
                 <Tile k="Stock on hand" v={`${d.inventory.units} units`} s={`${fmt(d.inventory.valueAtCostCents)} at cost · ${fmt(d.inventory.valueAtPriceCents)} at price`} />
-              </div>
+              </div>}
             </>
           );
         }}

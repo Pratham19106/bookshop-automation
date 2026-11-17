@@ -1,14 +1,11 @@
-const { tx } = require('./index');
-const users = require('../services/users');
+const bcrypt = require('bcryptjs');
+const { computeTotals } = require('../lib/money');
 const purchasing = require('../services/purchasing');
 const orders = require('../services/orders');
-const suppliersSvc = require('../services/suppliers');
-const { recordSale } = require('../services/sales');
-const { getSettings } = require('../services/settings');
-const { applyStock } = require('../services/inventory');
 
 const DAY = 86400000;
 
+// Valid ISBN-13 from a 9-digit body (978 prefix), so demo titles pass the API's checksum validation.
 function isbn13(body9) {
   const d = '978' + body9;
   let sum = 0;
@@ -22,99 +19,46 @@ function rng(seed) {
   return () => { s = (s * 1664525 + 1013904223) % 4294967296; return s / 4294967296; };
 }
 
-// [title, author, publisher, edition, genre, price, aisle, rack, shelf, popularity(0-1), startStock]
+// [title, author, publisher, edition, genre, price (₹), aisle, rack, shelf, popularity(0-1), shelf stock]
 const CATALOGUE = [
-  // --- Fiction & Contemporary ---
   ['The Alchemist', 'Paulo Coelho', 'HarperOne', 'Paperback 2014', 'Fiction', 299, 'A', '1', '2', 0.9, 40],
-  ['The Alchemist', 'Paulo Coelho', 'HarperCollins', 'Hardcover 2018', 'Fiction', 599, 'A', '1', '3', 0.2, 8],
   ['The White Tiger', 'Aravind Adiga', 'Atlantic Books', '1st', 'Fiction', 350, 'A', '1', '4', 0.45, 18],
-  ['Midnight\'s Children', 'Salman Rushdie', 'Vintage Classics', '40th Anniversary', 'Fiction', 550, 'A', '2', '1', 0.35, 15],
+  ["Midnight's Children", 'Salman Rushdie', 'Vintage Classics', '40th Anniversary', 'Fiction', 550, 'A', '2', '1', 0.35, 15],
   ['The God of Small Things', 'Arundhati Roy', 'IndiaInk', 'Paperback', 'Fiction', 399, 'A', '2', '2', 0.5, 22],
   ['The Kite Runner', 'Khaled Hosseini', 'Riverhead Books', '10th Anniversary', 'Fiction', 399, 'A', '2', '3', 0.65, 28],
-  ['Life of Pi', 'Yann Martel', 'Mariner Books', 'Illustrated', 'Fiction', 350, 'A', '2', '4', 0.4, 20],
-  ['The Shadow of the Wind', 'Carlos Ruiz Zafon', 'Penguin Books', 'Paperback', 'Fiction', 450, 'A', '3', '1', 0.45, 18],
   ['1984', 'George Orwell', 'Penguin', 'Paperback 2008', 'Fiction', 250, 'A', '3', '2', 0.6, 30],
   ['Animal Farm', 'George Orwell', 'Penguin', 'Paperback 2008', 'Fiction', 199, 'A', '3', '3', 0.6, 30],
   ['To Kill a Mockingbird', 'Harper Lee', 'Arrow', 'Paperback 2010', 'Fiction', 325, 'A', '3', '4', 0.45, 20],
-  ['The Catcher in the Rye', 'J. D. Salinger', 'Little, Brown', 'Paperback', 'Fiction', 350, 'A', '4', '1', 0.5, 25],
-  ['One Hundred Years of Solitude', 'Gabriel Garcia Marquez', 'Harper Perennial', '1st', 'Fiction', 499, 'A', '4', '2', 0.45, 20],
-
-  // --- Classics & World Literature ---
   ['Pride and Prejudice', 'Jane Austen', 'Penguin Classics', '2nd', 'Classics', 275, 'A', '4', '3', 0.35, 18],
   ['The Great Gatsby', 'F. Scott Fitzgerald', 'Scribner', 'Paperback 2004', 'Classics', 250, 'A', '4', '4', 0.5, 24],
   ['Crime and Punishment', 'Fyodor Dostoevsky', 'Vintage', 'Pevear Translation', 'Classics', 450, 'B', '1', '1', 0.35, 16],
-  ['The Picture of Dorian Gray', 'Oscar Wilde', 'Penguin Classics', 'Paperback', 'Classics', 225, 'B', '1', '2', 0.4, 18],
-  ['War and Peace', 'Leo Tolstoy', 'Oxford World Classics', 'Paperback', 'Classics', 799, 'B', '1', '3', 0.2, 10],
-
-  // --- Sci-Fi & Fantasy ---
   ['Dune', 'Frank Herbert', 'Ace Books', 'Deluxe Edition', 'Sci-Fi', 650, 'D', '1', '1', 0.8, 35],
-  ['Fahrenheit 451', 'Ray Bradbury', 'Simon & Schuster', '60th Anniversary', 'Sci-Fi', 350, 'D', '1', '2', 0.5, 22],
-  ['Brave New World', 'Aldous Huxley', 'Harper Perennial', 'Modern Classics', 'Sci-Fi', 325, 'D', '1', '3', 0.5, 22],
-  ['Foundation', 'Isaac Asimov', 'Spectra', '1st', 'Sci-Fi', 399, 'D', '1', '4', 0.45, 18],
   ['Project Hail Mary', 'Andy Weir', 'Ballantine Books', '1st', 'Sci-Fi', 599, 'D', '2', '1', 0.75, 26],
-  ['The Hitchhiker\'s Guide to the Galaxy', 'Douglas Adams', 'Del Rey', 'Paperback', 'Sci-Fi', 350, 'D', '2', '2', 0.55, 22],
   ['The Hobbit', 'J. R. R. Tolkien', 'Mariner Books', 'Paperback 2012', 'Fantasy', 450, 'D', '2', '3', 0.65, 30],
-  ['The Fellowship of the Ring', 'J. R. R. Tolkien', 'Mariner Books', 'Paperback 2012', 'Fantasy', 550, 'D', '2', '4', 0.6, 25],
-
-  // --- Self-Help & Psychology ---
   ['Atomic Habits', 'James Clear', 'Penguin', '1st', 'Self-Help', 499, 'B', '2', '1', 1.0, 45],
   ['Ikigai', 'Hector Garcia', 'Penguin', '1st', 'Self-Help', 350, 'B', '2', '2', 0.75, 28],
   ['Deep Work', 'Cal Newport', 'Piatkus', '1st', 'Self-Help', 450, 'B', '2', '3', 0.45, 20],
   ['The Psychology of Money', 'Morgan Housel', 'Jaico', '1st', 'Finance', 399, 'B', '2', '4', 0.85, 35],
   ['Thinking, Fast and Slow', 'Daniel Kahneman', 'Farrar, Straus and Giroux', '1st', 'Psychology', 499, 'B', '3', '1', 0.6, 24],
-  ['Man\'s Search for Meaning', 'Viktor E. Frankl', 'Beacon Press', '1st', 'Psychology', 299, 'B', '3', '2', 0.65, 26],
-  ['The Power of Habit', 'Charles Duhigg', 'Random House', 'Paperback', 'Self-Help', 425, 'B', '3', '3', 0.55, 22],
-  ['Can\'t Hurt Me', 'David Goggins', 'Lioncrest', 'Clean Edition', 'Biography', 599, 'B', '3', '4', 0.7, 25],
-
-  // --- Business, Finance & Leadership ---
+  ["Man's Search for Meaning", 'Viktor E. Frankl', 'Beacon Press', '1st', 'Psychology', 299, 'B', '3', '2', 0.65, 26],
   ['Rich Dad Poor Dad', 'Robert Kiyosaki', 'Plata', '20th Anniversary', 'Finance', 350, 'B', '4', '1', 0.75, 30],
   ['Zero to One', 'Peter Thiel', 'Virgin', '1st', 'Business', 499, 'B', '4', '2', 0.45, 18],
   ['The Intelligent Investor', 'Benjamin Graham', 'Harper Business', 'Revised 2006', 'Finance', 699, 'B', '4', '3', 0.65, 26],
   ['Shoe Dog', 'Phil Knight', 'Scribner', 'Paperback 2018', 'Business', 499, 'B', '4', '4', 0.6, 24],
-  ['Principles: Life and Work', 'Ray Dalio', 'Simon & Schuster', '1st', 'Business', 899, 'C', '1', '1', 0.45, 16],
-  ['The Lean Startup', 'Eric Ries', 'Crown Business', '1st', 'Business', 550, 'C', '1', '2', 0.5, 20],
-  ['Good to Great', 'Jim Collins', 'Harper Business', '1st', 'Business', 650, 'C', '1', '3', 0.35, 14],
-
-  // --- History, Philosophy & Science ---
   ['Sapiens', 'Yuval Noah Harari', 'Harvill Secker', '1st', 'History', 550, 'C', '2', '1', 0.7, 25],
-  ['Homo Deus', 'Yuval Noah Harari', 'Harvill Secker', '1st', 'History', 575, 'C', '2', '2', 0.4, 15],
-  ['Guns, Germs, and Steel', 'Jared Diamond', 'W. W. Norton', '20th Anniversary', 'History', 550, 'C', '2', '3', 0.4, 16],
-  ['Discovery of India', 'Jawaharlal Nehru', 'Penguin', '1st', 'History', 450, 'C', '2', '4', 0.25, 12],
   ['Wings of Fire', 'A. P. J. Abdul Kalam', 'Universities Press', '1st', 'Biography', 225, 'C', '3', '1', 0.65, 25],
-  ['An Era of Darkness', 'Shashi Tharoor', 'Aleph Book Company', '1st', 'History', 499, 'C', '3', '2', 0.5, 20],
   ['India After Gandhi', 'Ramachandra Guha', 'HarperCollins', '10th Anniversary', 'History', 750, 'C', '3', '3', 0.35, 14],
   ['A Brief History of Time', 'Stephen Hawking', 'Bantam', '10th Anniversary', 'Science', 399, 'C', '3', '4', 0.55, 22],
-  ['Cosmos', 'Carl Sagan', 'Ballantine Books', 'Paperback 2013', 'Science', 499, 'C', '4', '1', 0.45, 18],
-  ['The Gene: An Intimate History', 'Siddhartha Mukherjee', 'Scribner', '1st', 'Science', 599, 'C', '4', '2', 0.35, 15],
   ['Meditations', 'Marcus Aurelius', 'Modern Library', 'Hays Translation', 'Philosophy', 350, 'C', '4', '3', 0.7, 28],
-  ['Beyond Good and Evil', 'Friedrich Nietzsche', 'Vintage', 'Kaufmann Translation', 'Philosophy', 399, 'C', '4', '4', 0.3, 14],
-
-  // --- Technology & Software ---
   ['Clean Code', 'Robert C. Martin', 'Prentice Hall', '1st', 'Technology', 3200, 'E', '1', '1', 0.35, 12],
   ['Introduction to Algorithms', 'Cormen et al.', 'MIT Press', '4th', 'Technology', 5800, 'E', '1', '2', 0.15, 6],
-  ['Introduction to Algorithms', 'Cormen et al.', 'MIT Press', '3rd', 'Technology', 4500, 'E', '1', '3', 0.1, 4],
-  ['Python Crash Course', 'Eric Matthes', 'No Starch Press', '3rd', 'Technology', 2900, 'E', '1', '4', 0.35, 14],
-  ['Designing Data-Intensive Applications', 'Martin Kleppmann', 'O\'Reilly Media', '1st', 'Technology', 3400, 'E', '2', '1', 0.45, 16],
-  ['The Pragmatic Programmer', 'David Thomas & Andrew Hunt', 'Addison-Wesley', '20th Anniversary', 'Technology', 3100, 'E', '2', '2', 0.35, 12],
-  ['Design Patterns', 'Erich Gamma et al.', 'Addison-Wesley', '1st', 'Technology', 4200, 'E', '2', '3', 0.25, 8],
+  ['Designing Data-Intensive Applications', 'Martin Kleppmann', "O'Reilly Media", '1st', 'Technology', 3400, 'E', '2', '1', 0.45, 16],
   ['Grokking Algorithms', 'Aditya Bhargava', 'Manning', '1st', 'Technology', 1850, 'E', '2', '4', 0.5, 18],
-
-  // --- Mystery, Crime & Thrillers ---
   ['The Silent Patient', 'Alex Michaelides', 'Celadon Books', '1st', 'Mystery', 399, 'G', '1', '1', 0.8, 32],
   ['And Then There Were None', 'Agatha Christie', 'William Morrow', 'Paperback', 'Mystery', 299, 'G', '1', '2', 0.65, 25],
-  ['The Hound of the Baskervilles', 'Arthur Conan Doyle', 'Penguin Classics', 'Paperback', 'Mystery', 225, 'G', '1', '3', 0.5, 20],
-  ['The Da Vinci Code', 'Dan Brown', 'Anchor Books', 'Paperback', 'Mystery', 399, 'G', '1', '4', 0.6, 25],
-  ['Gone Girl', 'Gillian Flynn', 'Crown Publishing', '1st', 'Mystery', 350, 'G', '2', '1', 0.5, 20],
-
-  // --- Children, YA & Poetry ---
-  ['Harry Potter and the Philosopher\'s Stone', 'J. K. Rowling', 'Bloomsbury', 'Paperback 2014', 'Children', 399, 'F', '1', '1', 0.9, 45],
-  ['Harry Potter and the Chamber of Secrets', 'J. K. Rowling', 'Bloomsbury', 'Paperback 2014', 'Children', 399, 'F', '1', '2', 0.7, 30],
-  ['Harry Potter and the Prisoner of Azkaban', 'J. K. Rowling', 'Bloomsbury', 'Paperback 2014', 'Children', 450, 'F', '1', '3', 0.75, 30],
+  ["Harry Potter and the Philosopher's Stone", 'J. K. Rowling', 'Bloomsbury', 'Paperback 2014', 'Children', 399, 'F', '1', '1', 0.9, 45],
   ['The Little Prince', 'Antoine de Saint-Exupery', 'Egmont', '1st', 'Children', 199, 'F', '2', '1', 0.4, 18],
-  ['Percy Jackson: The Lightning Thief', 'Rick Riordan', 'Disney Hyperion', '1st', 'Children', 350, 'F', '2', '2', 0.6, 25],
   ['Gitanjali', 'Rabindranath Tagore', 'Fingerprint', '1st', 'Poetry', 150, 'G', '3', '1', 0.2, 12],
-  ['The Prophet', 'Kahlil Gibran', 'Knopf', 'Deluxe Edition', 'Poetry', 299, 'G', '3', '2', 0.4, 18],
-  ['Rumi: Selected Poems', 'Coleman Barks', 'Penguin Classics', 'Paperback', 'Poetry', 350, 'G', '3', '3', 0.35, 15]
 ];
 
 const SUPPLIERS = [
@@ -122,265 +66,235 @@ const SUPPLIERS = [
   { name: 'National Publishing House & Wholesale', contactPerson: 'Meera Joshi', phone: '+91 98200 22222', email: 'orders@nph.example', categories: 'History, Biography, Classics, Poetry, Philosophy', leadTimeDays: 7, discount: 0.60 },
   { name: 'TechBooks India Distribution Network', contactPerson: 'Rohan Patil', phone: '+91 98200 33333', email: 'sales@techbooks.example', categories: 'Technology, Business, Finance, Science', leadTimeDays: 9, discount: 0.68 },
   { name: 'Metro Wholesale Books Corporation', contactPerson: 'Farah Khan', phone: '+91 98200 44444', email: 'farah@metrobooks.example', categories: 'All categories', leadTimeDays: 3, discount: 0.65 },
-  { name: 'Heritage Imprints & Scholastic', contactPerson: 'Vikram Sengupta', phone: '+91 98200 55555', email: 'vikram@heritagebooks.example', categories: 'Classics, Philosophy, History, Poetry', leadTimeDays: 6, discount: 0.58 },
   { name: 'Apex Trade & Paperbacks Ltd', contactPerson: 'Sunita Menon', phone: '+91 98200 66666', email: 'orders@apextrade.example', categories: 'Fiction, Mystery, Sci-Fi, Fantasy', leadTimeDays: 5, discount: 0.64 },
-  { name: 'Vanguard Scientific & Academic Importers', contactPerson: 'Dr. K. Raman', phone: '+91 98200 77777', email: 'raman@vanguardbooks.example', categories: 'Technology, Science, Computer Science', leadTimeDays: 8, discount: 0.70 },
-  { name: 'SpeedyTrade Express Logistics', contactPerson: 'Deepak Varma', phone: '+91 98200 88888', email: 'express@speedytrade.example', categories: 'All categories', leadTimeDays: 2, discount: 0.55 }
 ];
 
-const CUSTOMER_NAMES = [
-  'Aarav Sharma', 'Priya Desai', 'Rahul Mehta', 'Ananya Iyer', 'Rohan Gupta',
-  'Aditi Rao', 'Vikram Patel', 'Sneha Kulkarni', 'Arjun Nair', 'Kavita Joshi',
-  'Devendra Singh', 'Pooja Verma', 'Manish Kapoor', 'Divya Sundaram', 'Siddharth Roy'
+const SHOPS = [
+  { code: 'S01', name: 'Pratham Books - Dadar (HQ)', city: 'Mumbai', address: '12 College Road, Dadar', phone: '022-2411 5452', isHq: true, traffic: 1.0 },
+  { code: 'S02', name: 'Pratham Books - FC Road', city: 'Pune', address: '44 Fergusson College Road', phone: '020-2553 9900', isHq: false, traffic: 0.7 },
 ];
+
+// username, full name, password, role, shop codes (owner: all)
+const USERS = [
+  ['Pratham19106', 'Pratham (Owner)', 'Password123', 'owner', []],
+  ['owner', 'Shop Owner', 'owner12345', 'owner', []],
+  ['manager', 'Meera Manager', 'manager12345', 'manager', ['S01', 'S02']],
+  ['worker', 'Store Worker', 'Worker123', 'staff', ['S01']],
+  ['staff', 'Counter Staff', 'staff12345', 'staff', ['S01']],
+  ['punestaff', 'Pune Counter Staff', 'staff12345', 'staff', ['S02']],
+];
+
+const CUSTOMERS = ['Aarav Sharma', 'Priya Desai', 'Rahul Mehta', 'Ananya Iyer', 'Rohan Gupta', 'Aditi Rao', 'Vikram Patel', 'Sneha Kulkarni', 'Arjun Nair', 'Kavita Joshi'];
+
+// All tenant tables, children first. catalog_books (the global ISBN catalogue) is never touched by the seed.
+const TENANT_TABLES = ['goods_receipt_items', 'goods_receipts', 'purchase_order_items', 'purchase_orders', 'supplier_books', 'suppliers',
+  'sale_returns', 'sale_items', 'order_payments', 'phone_order_items', 'sales', 'phone_orders', 'stock_movements', 'shop_stock',
+  'expenses', 'books', 'shop_counters', 'sessions', 'user_shops', 'users', 'shops', 'business_settings', 'businesses'];
+
+// Multi-row INSERT in chunks (Postgres allows 65535 bind parameters per statement).
+async function bulkInsert(q, table, cols, rows, returning = '') {
+  const out = [];
+  const per = Math.max(1, Math.floor(60000 / cols.length));
+  for (let i = 0; i < rows.length; i += per) {
+    const chunk = rows.slice(i, i + per);
+    const params = [];
+    const values = chunk.map((r) => `(${r.map((v) => { params.push(v); return `$${params.length}`; }).join(', ')})`);
+    const res = await q.query(`INSERT INTO ${table} (${cols.join(', ')}) VALUES ${values.join(', ')} ${returning ? `RETURNING ${returning}` : ''}`, params);
+    out.push(...res.rows);
+  }
+  return out;
+}
 
 /**
- * Loads a rich, realistic, comprehensive bookshop dataset:
- * - 70+ books with valid ISBN-13 checksums and physical store coordinates
- * - 8 competing suppliers with quoted wholesale costs
- * - 60 days of sales history across cash/card/UPI
- * - Active & completed phone orders with stock reservations
- * - Goods receipts establishing true weighted-average COGS
- * - Operating expenses (rent, electricity, internet, salaries)
- * - Owner (Pratham19106) and Worker (worker) credentials
+ * Demo data for one business with two shops:
+ *  - owner / manager / staff logins, staff assigned per shop
+ *  - ~40 hand-picked titles (+ up to 20 from the ISBN catalogue when it has been imported)
+ *  - 5 suppliers with quoted prices, 60 days of counter sales in both shops, expenses
+ *  - a received and an open purchase order, open phone orders with reservations (created through the services)
+ * Refuses to run on a database that already has businesses unless force = true, which wipes ALL tenant data.
  */
-function seedDemo(db, { now = new Date(), force = false } = {}) {
-  const userCount = db.prepare('SELECT COUNT(*) c FROM users').get().c;
-  if (userCount > 0 && !force) {
-    throw new Error('Database already contains records. Pass --force to replace with fresh comprehensive data.');
-  }
-
+async function seedDemo(db, { now = new Date(), force = false, log = () => {} } = {}) {
+  const { c } = await db.one('SELECT COUNT(*) AS c FROM businesses');
+  if (c > 0 && !force) throw new Error('Database already contains businesses. Pass --force to wipe all tenant data and reseed.');
   const rand = rng(42);
   const iso = (t) => new Date(t).toISOString();
+  const start = now.getTime() - 60 * DAY;
 
-  // If force is requested, clean up all existing records cleanly
-  if (force) {
-    tx(db, () => {
-      db.prepare('DELETE FROM sessions').run();
-      db.prepare('DELETE FROM sale_items').run();
-      db.prepare('DELETE FROM sales').run();
-      db.prepare('DELETE FROM order_payments').run();
-      db.prepare('DELETE FROM phone_order_items').run();
-      db.prepare('DELETE FROM phone_orders').run();
-      db.prepare('DELETE FROM stock_movements').run();
-      db.prepare('DELETE FROM supplier_books').run();
-      db.prepare('DELETE FROM goods_receipt_items').run();
-      db.prepare('DELETE FROM goods_receipts').run();
-      db.prepare('DELETE FROM purchase_order_items').run();
-      db.prepare('DELETE FROM purchase_orders').run();
-      db.prepare('DELETE FROM expenses').run();
-      db.prepare('DELETE FROM books').run();
-      db.prepare('DELETE FROM suppliers').run();
-      db.prepare('DELETE FROM users').run();
-    });
-  }
+  const ids = await db.tx(async (q) => {
+    if (force) await q.query(`TRUNCATE ${TENANT_TABLES.join(', ')} RESTART IDENTITY CASCADE`);
 
-  let owner, worker, demoOwner, demoStaff;
-  tx(db, () => {
-    // 1. Create Owner & Staff Users
-    owner = users.createUser(db, { username: 'Pratham19106', fullName: 'Pratham BookShop', password: 'Password123', role: 'owner' });
-    worker = users.createUser(db, { username: 'worker', fullName: 'Store Worker', password: 'Worker123', role: 'staff' });
-    // Also create demo logins for automated test compatibility
-    demoOwner = users.createUser(db, { username: 'owner', fullName: 'Shop Owner', password: 'owner12345', role: 'owner' });
-    demoStaff = users.createUser(db, { username: 'staff', fullName: 'Counter Staff', password: 'staff12345', role: 'staff' });
+    log('business, shops, users');
+    const business = await q.one(`INSERT INTO businesses(name, slug, email, phone) VALUES ('Pratham Books', 'pratham-books', 'hello@prathambooks.example', '022-2411 5452') RETURNING id`);
+    const bid = business.id;
+    await q.query('INSERT INTO business_settings(business_id) VALUES ($1)', [bid]);
+    const shopRows = await bulkInsert(q, 'shops', ['business_id', 'code', 'name', 'city', 'address', 'phone', 'is_hq'],
+      SHOPS.map((s) => [bid, s.code, s.name, s.city, s.address, s.phone, s.isHq]), 'id, code');
+    const shopId = Object.fromEntries(shopRows.map((r) => [r.code, r.id]));
+    const userId = {};
+    for (const [username, fullName, password, role, shops] of USERS) {
+      const u = await q.one(`INSERT INTO users(business_id, username, full_name, password_hash, role) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+        [bid, username, fullName, await bcrypt.hash(password, 10), role]);
+      userId[username] = u.id;
+      for (const code of shops) await q.query('INSERT INTO user_shops(business_id, user_id, shop_id) VALUES ($1, $2, $3)', [bid, u.id, shopId[code]]);
+    }
 
-    // 2. Configure Store Settings
-    db.prepare("UPDATE settings SET value = 'Pratham BookShop' WHERE key = 'shop_name'").run();
-    db.prepare("UPDATE settings SET value = '12 College Road, Mumbai' WHERE key = 'shop_address'").run();
+    log('books');
+    const titles = CATALOGUE.map(([title, author, publisher, edition, genre, price, aisle, rack, shelf, pop, stock], i) => ({
+      isbn: isbn13(String(100000000 + i * 7919).slice(0, 9)), title, author, publisher, edition, genre, price: price * 100,
+      aisle, rack, shelf, pop, stock,
+    }));
+    // Real titles from the imported ISBN catalogue, if present, so the demo shows catalogue-sourced stock too.
+    const fromCatalog = await q.many(`SELECT isbn, title, publisher, format, category, ref_price_cents FROM catalog_books
+                                       WHERE length(title) BETWEEN 5 AND 70 ORDER BY md5(isbn) LIMIT 20`);
+    fromCatalog.forEach((cb, i) => titles.push({
+      isbn: cb.isbn, title: cb.title, author: '', publisher: cb.publisher, edition: cb.format, genre: cb.category,
+      price: Math.max(19900, Math.round(((cb.ref_price_cents || 1500) * 0.9) / 100) * 100),
+      aisle: 'H', rack: String(1 + Math.floor(i / 5)), shelf: String(1 + (i % 5)), pop: 0.15, stock: 6,
+    }));
+    const bookRows = await bulkInsert(q, 'books', ['business_id', 'isbn', 'title', 'author', 'publisher', 'edition', 'genre', 'price_cents', 'created_at', 'updated_at'],
+      titles.map((t) => [bid, t.isbn, t.title, t.author, t.publisher, t.edition, t.genre, t.price, iso(start), iso(start)]), 'id, isbn');
+    const bookIdByIsbn = Object.fromEntries(bookRows.map((r) => [r.isbn, r.id]));
+    titles.forEach((t) => { t.id = bookIdByIsbn[t.isbn]; });
 
-    const start = now.getTime() - 60 * DAY;
-    const bookIds = [];
-    const supplierIds = [];
-
-    // 3. Insert Catalogue Books & Opening Stock
-    CATALOGUE.forEach((c, i) => {
-      const [title, author, publisher, edition, genre, price, aisle, rack, shelf, popularity, stock] = c;
-      const validIsbn = isbn13(String(100000000 + i * 7919).slice(0, 9));
-      const r = db.prepare(`INSERT INTO books(title, author, isbn, publisher, edition, genre, price_cents, aisle, rack, shelf, created_at, updated_at)
-                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
-        .run(title, author, validIsbn, publisher, edition, genre, price * 100, aisle, rack, shelf, iso(start), iso(start));
-      const id = Number(r.lastInsertRowid);
-      bookIds.push(id);
-
-      // Opening stock = what will be sold over 60 days plus final current stock on shelf
-      const expectedSales = Math.round(popularity * 55);
-      const openingStock = stock + expectedSales;
-      applyStock(db, { bookId: id, stockDelta: openingStock, reason: 'opening', note: 'Opening store inventory', userId: owner.id });
-      db.prepare('UPDATE stock_movements SET created_at = ? WHERE book_id = ?').run(iso(start), id);
-    });
-
-    // 4. Insert Suppliers
-    SUPPLIERS.forEach((s) => {
-      const created = suppliersSvc.create(db, s);
-      supplierIds.push(created.id);
-    });
-
-    // 5. Supplier Quoted Prices Matrix
-    CATALOGUE.forEach((c, i) => {
-      const genre = c[4];
-      const listPrice = c[5];
+    log('suppliers and quotes');
+    const supplierRows = await bulkInsert(q, 'suppliers', ['business_id', 'name', 'contact_person', 'phone', 'email', 'categories', 'lead_time_days'],
+      SUPPLIERS.map((s) => [bid, s.name, s.contactPerson, s.phone, s.email, s.categories, s.leadTimeDays]), 'id');
+    const quotes = [];
+    const cheapest = new Map();
+    for (const t of titles) {
       SUPPLIERS.forEach((s, si) => {
-        const covers = s.categories === 'All categories' || s.categories.includes(genre);
-        if (!covers) return;
-        const jitter = 1 + (rand() - 0.5) * 0.08;
-        const quotedUnitCost = Math.round(listPrice * s.discount * jitter) * 100;
-        db.prepare('INSERT OR REPLACE INTO supplier_books(supplier_id, book_id, unit_cost_cents) VALUES (?, ?, ?)')
-          .run(supplierIds[si], bookIds[i], quotedUnitCost);
+        if (s.categories !== 'All categories' && !s.categories.includes(t.genre)) return;
+        const cost = Math.round((t.price * s.discount * (1 + (rand() - 0.5) * 0.08)) / 100) * 100;
+        quotes.push([bid, supplierRows[si].id, t.id, cost]);
+        if (!cheapest.has(t.id) || cost < cheapest.get(t.id)) cheapest.set(t.id, cost);
       });
-    });
-
-    // 6. Establish Real Cost via Initial Goods Receipts 58 Days Ago
-    const cheapestQuotes = db.prepare(`SELECT book_id, supplier_id, MIN(unit_cost_cents) AS c FROM supplier_books GROUP BY book_id`).all();
-    const bySupplier = new Map();
-    for (const row of cheapestQuotes) {
-      if (!bySupplier.has(row.supplier_id)) bySupplier.set(row.supplier_id, []);
-      bySupplier.get(row.supplier_id).push(row);
     }
+    await bulkInsert(q, 'supplier_books', ['business_id', 'supplier_id', 'book_id', 'unit_cost_cents'], quotes);
 
-    for (const [sid, rows] of bySupplier) {
-      const po = purchasing.createPo(db, owner, {
-        supplierId: sid,
-        items: rows.map((r) => ({ bookId: r.book_id, quantity: 2, unitCostCents: r.c }))
-      });
-      purchasing.receive(db, owner, po.id, {
-        items: po.items.map((it) => ({ poItemId: it.id, quantity: it.qtyOrdered }))
-      });
-      db.prepare('UPDATE goods_receipts SET received_at = ? WHERE po_id = ?').run(iso(start + DAY), po.id);
-      db.prepare('UPDATE purchase_orders SET created_at = ? WHERE id = ?').run(iso(start), po.id);
-      db.prepare("UPDATE stock_movements SET created_at = ? WHERE reason = 'receipt' AND note = ?").run(iso(start + DAY), po.poNo);
-    }
-
-    // 7. Generate 60 Days of Realistic Counter Sales & Bills
-    const taxBp = getSettings(db).taxBp;
-    for (let d = 59; d >= 0; d--) {
-      const day = now.getTime() - d * DAY;
-      const isWeekend = [0, 6].includes(new Date(day).getUTCDay());
-      // 6 to 14 sales transactions per day
-      const dailyBills = Math.round((6 + rand() * 8) * (isWeekend ? 1.4 : 1.0));
-
-      for (let k = 0; k < dailyBills; k++) {
-        const lines = [];
-        const itemsInBasket = 1 + Math.floor(rand() * 3);
-        const pickedBooks = new Set();
-
-        for (let j = 0; j < itemsInBasket; j++) {
-          const idx = Math.floor(rand() * CATALOGUE.length);
-          if (pickedBooks.has(idx) || rand() > CATALOGUE[idx][9] + 0.12) continue;
-          pickedBooks.add(idx);
-
-          const b = db.prepare('SELECT * FROM books WHERE id = ?').get(bookIds[idx]);
-          const qty = 1 + (rand() < 0.25 ? 1 : 0);
-          if (b.stock_qty - b.reserved_qty < qty) continue;
-          lines.push({ bookId: b.id, quantity: qty, unitPriceCents: b.price_cents });
+    log('60 days of sales');
+    const { tax_bp: taxBp } = await q.one('SELECT tax_bp FROM business_settings WHERE business_id = $1', [bid]);
+    const sold = new Map(); // `${shop}:${book}` -> units
+    const saleRows = [];
+    const lineRows = [];
+    for (const s of SHOPS) {
+      const sid = shopId[s.code];
+      const cashiers = USERS.filter((u) => u[3] === 'owner' || u[4].includes(s.code)).map((u) => userId[u[0]]);
+      let billNo = 0;
+      for (let d = 59; d >= 0; d--) {
+        const day = now.getTime() - d * DAY;
+        const weekend = [0, 6].includes(new Date(day).getUTCDay());
+        const bills = Math.round((4 + rand() * 6) * (weekend ? 1.4 : 1) * s.traffic);
+        for (let k = 0; k < bills; k++) {
+          const lines = [];
+          const picked = new Set();
+          for (let j = 0, n = 1 + Math.floor(rand() * 3); j < n; j++) {
+            const t = titles[Math.floor(rand() * titles.length)];
+            if (picked.has(t.id) || rand() > t.pop + 0.12) continue;
+            picked.add(t.id);
+            lines.push({ bookId: t.id, t, quantity: 1 + (rand() < 0.25 ? 1 : 0), unitPriceCents: t.price });
+          }
+          if (!lines.length) continue;
+          billNo += 1;
+          const discountBp = rand() < 0.15 ? 500 : 0;
+          const tot = computeTotals(lines, discountBp, taxBp);
+          const key = `INV-${s.code}-${String(billNo).padStart(6, '0')}`;
+          saleRows.push([bid, sid, key, rand() < 0.4 ? CUSTOMERS[Math.floor(rand() * CUSTOMERS.length)] : '', ['cash', 'upi', 'card'][Math.floor(rand() * 3)],
+            tot.subtotalCents, discountBp, tot.discountCents, taxBp, tot.taxCents, tot.totalCents,
+            cashiers[Math.floor(rand() * cashiers.length)], iso(day - Math.floor(rand() * 9 * 3600000) - 3600000)]);
+          for (const l of lines) {
+            lineRows.push({ key: `${sid}|${key}`, l });
+            sold.set(`${sid}:${l.bookId}`, (sold.get(`${sid}:${l.bookId}`) || 0) + l.quantity);
+          }
         }
-
-        if (!lines.length) continue;
-
-        const discountBp = rand() < 0.15 ? 500 : (rand() < 0.05 ? 1000 : 0);
-        const saleTimestamp = day - Math.floor(rand() * 9 * 3600000) - 3600000;
-        const customerName = rand() < 0.4 ? CUSTOMER_NAMES[Math.floor(rand() * CUSTOMER_NAMES.length)] : '';
-        const paymentMethod = ['cash', 'upi', 'card'][Math.floor(rand() * 3)];
-        const cashier = rand() < 0.6 ? worker.id : owner.id;
-
-        const sale = recordSale(db, {
-          lines,
-          discountBp,
-          taxBp,
-          paymentMethod,
-          customerName,
-          userId: cashier
-        });
-
-        db.prepare('UPDATE sales SET created_at = ? WHERE id = ?').run(iso(saleTimestamp), sale.saleId);
-        db.prepare("UPDATE stock_movements SET created_at = ? WHERE reason = 'sale' AND ref_id = ?").run(iso(saleTimestamp), sale.saleId);
       }
+      await q.query(`INSERT INTO shop_counters(shop_id, kind, value) VALUES ($1, 'bill', $2)`, [sid, billNo]);
+    }
+    const inserted = await bulkInsert(q, 'sales', ['business_id', 'shop_id', 'bill_no', 'customer_name', 'payment_method', 'subtotal_cents', 'discount_bp',
+      'discount_cents', 'tax_bp', 'tax_cents', 'total_cents', 'user_id', 'created_at'], saleRows, 'id, shop_id, bill_no, created_at, user_id');
+    const saleByKey = new Map(inserted.map((r) => [`${r.shop_id}|${r.bill_no}`, r]));
+    await bulkInsert(q, 'sale_items', ['sale_id', 'book_id', 'title', 'author', 'isbn', 'edition', 'quantity', 'unit_price_cents', 'unit_cost_cents', 'line_total_cents'],
+      lineRows.map(({ key, l }) => [saleByKey.get(key).id, l.bookId, l.t.title, l.t.author, l.t.isbn, l.t.edition, l.quantity, l.unitPriceCents,
+        cheapest.get(l.bookId) || 0, l.unitPriceCents * l.quantity]));
 
-      // Operating Overheads
-      if (d % 15 === 0) {
-        db.prepare('INSERT INTO expenses(expense_date, category, description, amount_cents, user_id) VALUES (?, ?, ?, ?, ?)')
-          .run(iso(day).slice(0, 10), 'Rent', 'Store premises lease', 2500000, owner.id);
-      }
-      if (d % 30 === 5) {
-        db.prepare('INSERT INTO expenses(expense_date, category, description, amount_cents, user_id) VALUES (?, ?, ?, ?, ?)')
-          .run(iso(day).slice(0, 10), 'Utilities', 'Electricity & AC power bill', 420000, owner.id);
-      }
-      if (d % 30 === 18) {
-        db.prepare('INSERT INTO expenses(expense_date, category, description, amount_cents, user_id) VALUES (?, ?, ?, ?, ?)')
-          .run(iso(day).slice(0, 10), 'Packaging', 'Paper book bags & receipt thermal rolls', 185000, owner.id);
-      }
-      if (d % 30 === 1) {
-        db.prepare('INSERT INTO expenses(expense_date, category, description, amount_cents, user_id) VALUES (?, ?, ?, ?, ?)')
-          .run(iso(day).slice(0, 10), 'Wages', 'Staff assistant monthly wage', 1500000, owner.id);
+    log('stock and ledger');
+    const stockRows = [];
+    const moves = [];
+    for (const s of SHOPS) {
+      const sid = shopId[s.code];
+      for (const t of titles) {
+        const unitsSold = sold.get(`${sid}:${t.id}`) || 0;
+        // A few fast sellers are running low in the HQ shop, so restocking has something to recommend.
+        const runningLow = s.code === 'S01' && t.pop >= 0.75 && t.pop < 0.9;
+        const onShelf = runningLow ? 3 : Math.max(2, Math.round(t.stock * s.traffic));
+        stockRows.push([bid, sid, t.id, onShelf, cheapest.get(t.id) || 0, t.aisle, t.rack, t.shelf, iso(start)]);
+        moves.push([bid, sid, t.id, onShelf + unitsSold, 'opening', null, null, 'Opening store inventory', userId.Pratham19106, iso(start)]);
       }
     }
+    for (const { key, l } of lineRows) {
+      const sale = saleByKey.get(key);
+      moves.push([bid, sale.shop_id, l.bookId, -l.quantity, 'sale', 'sale', sale.id, sale.bill_no, sale.user_id, sale.created_at]);
+    }
+    await bulkInsert(q, 'shop_stock', ['business_id', 'shop_id', 'book_id', 'stock_qty', 'cost_cents', 'aisle', 'rack', 'shelf', 'created_at'], stockRows);
+    await bulkInsert(q, 'stock_movements', ['business_id', 'shop_id', 'book_id', 'delta', 'reason', 'ref_type', 'ref_id', 'note', 'user_id', 'created_at'], moves);
+    // The old seed locations do not prove physical placement; keep copies unassigned until confirmed.
+    await q.query(`INSERT INTO shelves(business_id,shop_id,aisle,rack,shelf,capacity)
+      SELECT DISTINCT business_id,shop_id,aisle,rack,shelf,50 FROM shop_stock
+      WHERE business_id=$1 AND btrim(aisle)<>'' AND btrim(rack)<>'' AND btrim(shelf)<>''
+      ON CONFLICT(shop_id,aisle,rack,shelf) DO NOTHING`,[bid]);
+    await q.query(`INSERT INTO arrangement_tasks(business_id,shop_id,book_id,qty,source)
+      SELECT business_id,shop_id,book_id,stock_qty,'migration' FROM shop_stock WHERE business_id=$1 AND stock_qty>0`,[bid]);
 
-    // 8. Recent Purchasing Activity & Open In-Transit POs
-    const recentPo = purchasing.createPo(db, owner, {
-      supplierId: supplierIds[2],
-      items: [
-        { bookId: bookIds[54], quantity: 6 }, // Clean Code
-        { bookId: bookIds[58], quantity: 5 }  // Designing Data-Intensive Apps
-      ]
-    });
-    purchasing.receive(db, owner, recentPo.id, {
-      items: recentPo.items.map((i) => ({ poItemId: i.id, quantity: i.qtyOrdered }))
-    });
-    const recentDate = iso(now.getTime() - 8 * DAY);
-    db.prepare('UPDATE goods_receipts SET received_at = ? WHERE po_id = ?').run(recentDate, recentPo.id);
-    db.prepare('UPDATE purchase_orders SET created_at = ? WHERE id = ?').run(recentDate, recentPo.id);
-    db.prepare("UPDATE stock_movements SET created_at = ? WHERE reason = 'receipt' AND note = ?").run(recentDate, recentPo.poNo);
+    log('expenses');
+    const exp = [];
+    for (const s of SHOPS) {
+      for (let d = 59; d >= 0; d--) {
+        const date = iso(now.getTime() - d * DAY).slice(0, 10);
+        if (d % 30 === 0) exp.push([bid, shopId[s.code], date, 'Rent', 'Store premises lease', Math.round((5000000 * s.traffic) / 100) * 100, userId.Pratham19106]);
+        if (d % 30 === 5) exp.push([bid, shopId[s.code], date, 'Utilities', 'Electricity bill', Math.round((420000 * s.traffic) / 100) * 100, userId.Pratham19106]);
+        if (d % 30 === 1) exp.push([bid, shopId[s.code], date, 'Wages', 'Counter staff wages', 1500000, userId.Pratham19106]);
+      }
+    }
+    await bulkInsert(q, 'expenses', ['business_id', 'shop_id', 'expense_date', 'category', 'description', 'amount_cents', 'user_id'], exp);
 
-    // One open purchase order currently in transit
-    purchasing.createPo(db, owner, {
-      supplierId: supplierIds[0],
-      items: [
-        { bookId: bookIds[26], quantity: 15 }, // Atomic Habits
-        { bookId: bookIds[27], quantity: 10 }  // Ikigai
-      ],
-      notes: 'Weekly fast-seller replenishment order'
-    });
+    return { bid, shopId, userId, titles, supplierIds: supplierRows.map((r) => r.id) };
+  });
 
-    // 9. Active & Completed Phone-in Orders (Stock Reservations)
-    const o1 = orders.createOrder(db, owner, {
-      customerName: 'Priya Desai',
-      customerPhone: '+91 98765 43210',
-      deliveryType: 'delivery',
-      deliveryAddress: '4B, Lotus Apartments, Dadar, Mumbai',
-      items: [
-        { bookId: bookIds[26], quantity: 2 }, // Atomic Habits
-        { bookId: bookIds[29], quantity: 1 }  // Psychology of Money
-      ],
-      advancePayment: { amountCents: 50000, method: 'upi' },
-      promisedDate: iso(now.getTime() + 2 * DAY).slice(0, 10)
-    });
-    orders.setStatus(db, o1.id, { status: 'ready' });
+  // Live workflow objects go through the real services so they exercise the same rules as the app.
+  log('purchase orders and phone orders');
+  const owner = await db.one('SELECT * FROM users WHERE id = $1', [ids.userId.Pratham19106]);
+  const ctx = (shopCode) => ({
+    db, user: owner, businessId: ids.bid, shopIds: Object.values(ids.shopId), shopId: ids.shopId[shopCode], tz: 330,
+  });
+  const byTitle = (t) => ids.titles.find((x) => x.title === t).id;
 
-    orders.createOrder(db, worker, {
-      customerName: 'Rahul Mehta',
-      customerPhone: '+91 98200 12345',
-      deliveryType: 'pickup',
-      items: [{ bookId: bookIds[0], quantity: 1 }],
-      notes: 'Customer will collect after 6 PM today'
-    });
-
-    orders.createOrder(db, worker, {
-      customerName: 'Siddharth Roy',
-      customerPhone: '+91 98111 22334',
-      deliveryType: 'pickup',
-      items: [{ bookId: bookIds[18], quantity: 1 }], // Dune
-      advancePayment: { amountCents: 65000, method: 'cash' },
-      notes: 'Hold until Saturday morning'
-    });
+  const po = await purchasing.createPo(ctx('S01'), {
+    supplierId: ids.supplierIds[2],
+    items: [{ bookId: byTitle('Clean Code'), quantity: 6 }, { bookId: byTitle('Designing Data-Intensive Applications'), quantity: 5 }],
+  });
+  await purchasing.receive(ctx('S01'), po.id, { items: po.items.map((i) => ({ poItemId: i.id, quantity: i.qtyOrdered })) });
+  await purchasing.createPo(ctx('S02'), {
+    supplierId: ids.supplierIds[0],
+    items: [{ bookId: byTitle('Atomic Habits'), quantity: 15 }, { bookId: byTitle('Ikigai'), quantity: 10 }],
+    notes: 'Weekly fast-seller replenishment',
+  });
+  const o1 = await orders.createOrder(ctx('S01'), {
+    customerName: 'Priya Desai', customerPhone: '+91 98765 43210', deliveryType: 'delivery', deliveryAddress: '4B Lotus Apartments, Dadar, Mumbai',
+    items: [{ bookId: byTitle('Atomic Habits'), quantity: 2 }, { bookId: byTitle('The Psychology of Money'), quantity: 1 }],
+    advancePayment: { amountCents: 50000, method: 'upi' }, promisedDate: iso(now.getTime() + 2 * DAY).slice(0, 10),
+  });
+  await orders.setStatus(ctx('S01'), o1.id, { status: 'ready' });
+  await orders.createOrder(ctx('S02'), {
+    customerName: 'Rahul Mehta', customerPhone: '+91 98200 12345', deliveryType: 'pickup',
+    items: [{ bookId: byTitle('Dune'), quantity: 1 }], notes: 'Collects after 6 PM',
   });
 
   return {
-    owner: 'Pratham19106 / Password123',
-    worker: 'worker / Worker123',
-    demoOwner: 'owner / owner12345',
-    demoStaff: 'staff / staff12345',
-    bookCount: CATALOGUE.length,
-    supplierCount: SUPPLIERS.length
+    logins: USERS.map(([u, , p, role, shops]) => `${role.padEnd(7)} ${u} / ${p}${shops.length ? `  (${shops.join(', ')})` : '  (all shops)'}`),
+    bookCount: ids.titles.length,
+    fromCatalog: ids.titles.filter((t) => t.aisle === 'H').length,
+    supplierCount: SUPPLIERS.length,
+    shops: SHOPS.map((s) => `${s.code} ${s.name}`),
   };
 }
 
-module.exports = { seedDemo, CATALOGUE, SUPPLIERS };
+module.exports = { seedDemo, CATALOGUE, SUPPLIERS, isbn13 };

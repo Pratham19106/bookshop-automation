@@ -16,10 +16,10 @@ function findBrowserExe() {
   return candidates.filter(Boolean).find((p) => fs.existsSync(p));
 }
 
+// Whole rupees only (amounts are rounded to the nearest rupee).
 function fmtMoney(cents, symbol = '₹') {
-  const rs = Math.floor(cents / 100);
-  const ps = String(cents % 100).padStart(2, '0');
-  return { rs, ps, formatted: `${symbol}${rs.toLocaleString('en-IN')}.${ps}` };
+  const rs = Math.round((cents || 0) / 100);
+  return { rs, ps: '', formatted: `${symbol}${rs.toLocaleString('en-IN')}` };
 }
 
 function fmtDate(iso) {
@@ -370,7 +370,7 @@ function renderBillHtml(sale, settings = {}) {
           <th class="col-rate">RATE</th>
           <th colspan="2" style="text-align:center;">
             Amount<br>
-            <span style="font-size:10px; font-weight:normal;">Rs. &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; Ps.</span>
+            <span style="font-size:10px; font-weight:normal;">Rs.</span>
           </th>
         </tr>
       </thead>

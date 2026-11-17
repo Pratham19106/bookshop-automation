@@ -1,8 +1,8 @@
 {
   "name": "bookshop-automation",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "private": true,
-  "description": "Bookshop Automation System - catalogue, billing, inventory, restocking, suppliers, dashboard, phone orders",
+  "description": "Bookshop Automation System - multi-shop catalogue, billing, inventory, restocking, suppliers, dashboard, phone orders (Supabase Postgres)",
   "main": "src/server.js",
   "type": "commonjs",
   "engines": {
@@ -11,21 +11,21 @@
   "scripts": {
     "build": "node -e \"console.log('Backend build complete')\"",
     "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
     "migrate": "node src/db/migrate-cli.js",
     "seed": "node src/db/seed-cli.js",
-    "test": "node --test --test-concurrency=1 --test-reporter=dot \"test/*.test.js\"",
-    "backup": "node scripts/backup.js",
+    "import-catalog": "node scripts/import-catalog.js",
     "create-owner": "node scripts/create-owner.js",
-    "dev": "node --watch src/server.js",
+    "backup": "node scripts/backup.js",
+    "prod-check": "node scripts/prod-check.js",
+    "test": "node --test --test-concurrency=1 --test-reporter=dot \"test/*.test.js\"",
     "test:ui": "node e2e/smoke.js"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.119.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^13.0.3",
+    "csv-parse": "^5.6.0",
     "express": "^5.3.0",
     "pg": "^8.23.1",
-    "puppeteer-core": "^25.15.0",
-    "ws": "^8.23.0"
+    "puppeteer-core": "^25.15.0"
   }
 }

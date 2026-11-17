@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { get, post, put, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
-import { bookName, fmt, fmtDate, fmtDateTime, label, money, parseMoney, today } from '../lib/format';
-import { useDebounced, useLoad } from '../lib/hooks';
+import { billTotals, bookName, fmt, fmtDate, fmtDateTime, label, money, parseMoney, roundRupee, today } from '../lib/format';
+import { useCached, useDebounced } from '../lib/hooks';
 import { toast } from '../lib/overlays';
+import { broadcastEvent } from '../lib/events';
 import { Actions, Async, Badge, BookPicker, Button, Empty, Field, Modal, PageTitle, Tabs, useAction } from '../lib/ui';
 
 const METHODS = ['cash', 'upi', 'card', 'other'];
@@ -14,7 +15,7 @@ const MethodSelect = ({ value, onChange, id }) => (
 );
 
 function OrderForm({ order, onClose, onSaved }) {
-  const { isOwner, settings } = useAuth();
+  const { isOwner, settings, maxDiscountPercent } = useAuth();
   const edit = !!order;
   const [f, setF] = useState({
     name: order?.customerName ?? '', phone: order?.customerPhone ?? '', type: order?.deliveryType ?? 'pickup', address: order?.deliveryAddress ?? '',
@@ -24,9 +25,8 @@ function OrderForm({ order, onClose, onSaved }) {
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
 
   const add = (b) => setLines((l) => (l.some((x) => x.bookId === b.id) ? l.map((x) => (x.bookId === b.id ? { ...x, quantity: x.quantity + 1 } : x)) : [...l, { bookId: b.id, title: bookName(b), price: b.priceCents, quantity: 1 }]));
-  const sub = lines.reduce((s, l) => s + l.price * l.quantity, 0);
-  const disc = Math.round((sub * Math.round((Number(f.discount) || 0) * 100)) / 10000);
-  const tax = Math.round(((sub - disc) * Math.round((order ? order.taxPercent : settings.taxPercent) * 100)) / 10000);
+  // Whole rupees, same rounding as the server.
+  const { sub, disc, tax } = billTotals(lines.reduce((s, l) => s + roundRupee(l.price) * l.quantity, 0), f.discount, order ? order.taxPercent : settings.taxPercent);
 
   const [save, busy] = useAction(async () => {
     if (!lines.length) throw new Error('Add at least one book');
@@ -36,7 +36,7 @@ function OrderForm({ order, onClose, onSaved }) {
     };
     if (!edit && f.adv.trim()) {
       const cents = parseMoney(f.adv);
-      if (!cents) throw new Error('Enter the advance like 200 or 200.50');
+      if (!cents) throw new Error('Enter the advance in rupees, like 200');
       body.advancePayment = { amountCents: cents, method: f.advMethod };
     }
     const saved = edit ? await put(`/orders/${order.id}`, body) : await post('/orders', body);
@@ -71,7 +71,7 @@ function OrderForm({ order, onClose, onSaved }) {
           </div>
         )}
         <div className="grid sm:grid-cols-2 gap-x-2.5 mt-2">
-          <Field label={`Discount %${isOwner ? '' : ` (max ${settings.staffMaxDiscountPercent}%)`}`} htmlFor="od"><input id="od" type="number" min="0" max="100" step="0.5" className="input font-mono" value={f.discount} onChange={set('discount')} /></Field>
+          <Field label={`Discount %${isOwner ? '' : ` (max ${maxDiscountPercent}%)`}`} htmlFor="od"><input id="od" type="number" min="0" max="100" step="0.5" className="input font-mono" value={f.discount} onChange={set('discount')} /></Field>
           {!edit && (
             <Field label={`Advance payment (${settings.currencySymbol}, optional)`} htmlFor="adv">
               <div className="flex gap-1.5"><input id="adv" className="input font-mono" inputMode="decimal" value={f.adv} onChange={set('adv')} /><MethodSelect value={f.advMethod} onChange={(v) => setF((s) => ({ ...s, advMethod: v }))} /></div>
@@ -111,7 +111,7 @@ function MoneyDialog({ title, intro, initial, action, done, onClose, children })
 }
 
 function OrderDetail({ id, onClose, onChange }) {
-  const st = useLoad(() => get(`/orders/${id}`), [id]);
+  const st = useCached(['orders', 'detail', id], () => get(`/orders/${id}`));
   const [sub, setSub] = useState(null);
   const [reason, setReason] = useState('');
   const [method, setMethod] = useState('cash');
@@ -189,7 +189,7 @@ function OrderDetail({ id, onClose, onChange }) {
             ? <><p className="mb-2">Collect the balance of <strong>{fmt(o.balanceCents)}</strong> now.</p><Field label="Payment method" htmlFor="m"><MethodSelect id="m" value={method} onChange={setMethod} /></Field></>
             : <p className="text-olive mb-2">Fully paid already.</p>}
           <Actions><Button onClick={() => setSub(null)}>Not yet</Button>
-            <Button variant="primary" id="complete" onClick={async () => { await post(`/orders/${id}/fulfil`, o.balanceCents > 0 ? { paymentMethod: method } : {}); toast('Order completed and billed'); setSub(null); refresh(); }}>Complete &amp; bill</Button></Actions>
+            <Button variant="primary" id="complete" onClick={async () => { await post(`/orders/${id}/fulfil`, o.balanceCents > 0 ? { paymentMethod: method } : {}); broadcastEvent('sale', { orderId: id }); toast('Order completed and billed'); setSub(null); refresh(); }}>Complete &amp; bill</Button></Actions>
         </Modal>
       )}
     </>
@@ -203,7 +203,7 @@ export default function Orders() {
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(false);
   const dq = useDebounced(q);
-  const st = useLoad(() => get(`/orders${qs({ status, payment, q: dq, limit: 100 })}`), [status, payment, dq]);
+  const st = useCached(['orders', 'list', status, payment, dq], () => get(`/orders${qs({ status, payment, q: dq, limit: 100 })}`));
   const tabs = [['open', 'Open'], ['placed', 'New'], ['ready', 'Ready'], ['out_for_delivery', 'Out for delivery'], ['completed', 'Completed'], ['cancelled', 'Cancelled'], ['', 'All']];
 
   return (
@@ -211,9 +211,6 @@ export default function Orders() {
       <PageTitle
         actions={
           <div className="flex items-center gap-2">
-            <span className="bg-[#FEF3C7] text-[#B45309] font-mono text-xs font-bold px-2.5 py-1 border border-[#B45309] shadow-[2px_2px_0px_0px_#B45309] hidden sm:inline-block">
-              03 · Reservations
-            </span>
             <button id="new" className="btn btn-primary" onClick={() => setAdding(true)}>
               + New order
             </button>

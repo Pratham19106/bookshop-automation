@@ -23,6 +23,16 @@ function int(v, field, { min = 0, max = 1e9, required = true } = {}) {
   return n;
 }
 
+// Money in minor units (paise), always a whole number of rupees: the value is rounded to the nearest rupee.
+// Amounts that must be positive (min >= 1) must be at least one rupee after rounding.
+function money(v, field, { min = 0, max = 1e11, required = true } = {}) {
+  const n = int(v, field, { min: 0, max, required });
+  if (n === null) return null;
+  const rounded = Math.round(n / 100) * 100;
+  if (min > 0 && rounded < 100) throw badRequest(`${field} must be at least 1 rupee`);
+  return rounded;
+}
+
 function oneOf(v, field, allowed, { required = true, fallback } = {}) {
   if (v === undefined || v === null || v === '') {
     if (required) throw badRequest(`${field} is required`);
@@ -76,4 +86,4 @@ function isbn(v, field = 'isbn') {
   throw badRequest(`${field} must be a valid ISBN-10 or ISBN-13`);
 }
 
-module.exports = { str, int, oneOf, date, array, object, isbn };
+module.exports = { str, int, money, oneOf, date, array, object, isbn };

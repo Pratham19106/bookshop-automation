@@ -4,14 +4,20 @@ services:
     env: node
     plan: free
     rootDir: backend
-    buildCommand: npm install && npm run build
+    buildCommand: npm install
     startCommand: npm start
     healthCheckPath: /health
     autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: 22
-      - key: TZ_OFFSET_MINUTES
-        value: -330
+      - key: DATABASE_URL          # new Supabase project, Session pooler (port 5432). Set in the Render dashboard.
+        sync: false
+      - key: MIGRATE_ON_START      # apply new supabase/migrations on each deploy
+        value: 1
+      - key: TZ_OFFSET_MINUTES     # India
+        value: 330
+      - key: COOKIE_SECURE
+        value: 1
       - key: SESSION_HOURS
         value: 12

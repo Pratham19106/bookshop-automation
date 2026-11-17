@@ -1,22 +1,26 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { get, post, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { daysAgo, fmt, fmtDateTime, label, today } from '../lib/format';
-import { useDebounced, useLoad } from '../lib/hooks';
+import { useCached, useDebounced } from '../lib/hooks';
 import { toast } from '../lib/overlays';
 import { Actions, Async, Badge, Button, Empty, Field, Modal, PageTitle, BookPicker } from '../lib/ui';
-import { subscribeToActivity, broadcastEvent, supabase } from '../lib/supabase';
+import { broadcastEvent } from '../lib/events';
 import { CheckCircle2, Clock, RotateCcw, ArrowLeftRight } from 'lucide-react';
+import AdjustmentDialog from './AdjustmentDialog';
+import { useShop } from '../lib/shop';
 
 function RefundModal({ sale, item, onClose, onSuccess }) {
   const eligibleQty = item.quantity - (item.returnedQty || 0);
   const [qty, setQty] = useState(1);
-  const [reason, setReason] = useState('Customer return within 1 week policy');
+  const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const netUnit = Math.round(item.unitPriceCents * (1 - (sale.discountPercent || 0) / 100));
-  const refundTotal = netUnit * qty;
+  // Same arithmetic as the server: discounted price of the copies plus the tax charged on it.
+  // Whole rupees, same rounding as the server.
+  const refundNet = Math.round((item.unitPriceCents * qty * (1 - (sale.discountPercent || 0) / 100)) / 100) * 100;
+  const refundTotal = refundNet + Math.round((refundNet * (sale.taxPercent || 0)) / 100 / 100) * 100;
 
   const doRefund = async () => {
     setBusy(true);
@@ -63,7 +67,7 @@ function RefundModal({ sale, item, onClose, onSuccess }) {
             className="input"
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            placeholder="e.g. Customer returned within 7 days"
+            placeholder="e.g. Damaged copy, bought twice"
           />
         </Field>
 
@@ -91,7 +95,7 @@ function RefundModal({ sale, item, onClose, onSuccess }) {
 function ExchangeModal({ sale, item, onClose, onSuccess }) {
   const eligibleQty = item.quantity - (item.returnedQty || 0);
   const [qty, setQty] = useState(1);
-  const [reason, setReason] = useState('Customer exchange within 1 week policy');
+  const [reason, setReason] = useState('');
   const [replacementBook, setReplacementBook] = useState(null);
   const [busy, setBusy] = useState(false);
 
@@ -219,12 +223,14 @@ function ExchangeModal({ sale, item, onClose, onSuccess }) {
 }
 
 export function BillDialog({ id, onClose, onChange }) {
-  const { isOwner } = useAuth();
-  const st = useLoad(() => get(`/sales/${id}`), [id]);
+  const { isOwner, isManager } = useAuth();
+  const { currentShop } = useShop();
+  const st = useCached(['bills', 'detail', id], () => get(`/sales/${id}`));
   const [voiding, setVoiding] = useState(false);
   const [reason, setReason] = useState('');
   const [refundTarget, setRefundTarget] = useState(null);
   const [exchangeTarget, setExchangeTarget] = useState(null);
+  const [adjusting, setAdjusting] = useState(false);
 
   const b = st.data;
   if (!b) return <Modal title="Bill" onClose={onClose}><Async state={st}>{() => null}</Async></Modal>;
@@ -239,20 +245,21 @@ export function BillDialog({ id, onClose, onChange }) {
 
   return (
     <Modal title={`Bill ${b.billNo}`} wide onClose={onClose}>
-      {/* 7-Day Return Policy Badge */}
-      <div className="flex items-center gap-2 mb-3">
+      {/* Return window (days come from the business settings) */}
+      {b.status === 'completed' && <div className="flex items-center gap-2 mb-3">
         {b.isReturnEligible ? (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#DCFCE7] text-[#15803D] border border-[#15803D] text-xs font-mono font-bold shadow-[1.5px_1.5px_0px_0px_#15803D]">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#DCFCE7] text-[#15803D] border border-[#15803D] text-xs font-bold">
             <CheckCircle2 className="w-3.5 h-3.5" />
-            7-Day Return & Exchange Active ({b.returnDaysRemaining} day{b.returnDaysRemaining === 1 ? '' : 's'} remaining)
+            Returns and exchanges open: {b.returnDaysRemaining} day{b.returnDaysRemaining === 1 ? '' : 's'} left
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FEF3C7] text-[#B45309] border border-[#B45309] text-xs font-mono font-bold shadow-[1.5px_1.5px_0px_0px_#B45309]">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#FEF3C7] text-[#B45309] border border-[#B45309] text-xs font-bold">
             <Clock className="w-3.5 h-3.5" />
-            Return Policy Expired (&gt;7 days from purchase)
+            Return period over{b.returnWindowDays ? ` (${b.returnWindowDays} days from purchase)` : ''}
           </span>
         )}
-      </div>
+      </div>}
+      {currentShop?.id !== b.shopId && <p className="notice notice-warn">Switch to this bill's shop before processing a return or exchange.</p>}
 
       <dl className="kv">
         <dt>Date</dt><dd>{fmtDateTime(b.createdAt)}</dd>
@@ -271,7 +278,7 @@ export function BillDialog({ id, onClose, onChange }) {
               <th className="num">Price</th>
               <th className="num">Qty</th>
               <th className="num">Total</th>
-              {isOwner && <th className="num">Cost</th>}
+              {isManager && <th className="num">Cost</th>}
               <th className="text-center">Returns / Policy</th>
             </tr>
           </thead>
@@ -296,26 +303,11 @@ export function BillDialog({ id, onClose, onChange }) {
                     )}
                   </td>
                   <td className="num">{fmt(i.lineTotalCents)}</td>
-                  {isOwner && <td className="num">{i.unitCostCents ? fmt(i.unitCostCents) : '—'}</td>}
+                  {isManager && <td className="num">{i.unitCostCents ? fmt(i.unitCostCents) : '—'}</td>}
                   <td className="text-center whitespace-nowrap">
-                    {b.isReturnEligible && eligibleQty > 0 ? (
+                    {b.isReturnEligible && currentShop?.id === b.shopId && eligibleQty > 0 ? (
                       <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          className="btn btn-sm text-xs bg-[#FFE4E6] text-[#BE123C] border-[#BE123C] hover:bg-[#BE123C] hover:text-white"
-                          onClick={() => setRefundTarget(i)}
-                          title="Refund this item back to stock within 1 week"
-                        >
-                          <RotateCcw className="w-3 h-3 inline mr-1" /> Refund
-                        </button>
-                        <button
-                          type="button"
-                          className="btn btn-sm text-xs bg-[#FAF5FF] text-[#6B21A8] border-[#9333EA] hover:bg-[#9333EA] hover:text-white"
-                          onClick={() => setExchangeTarget(i)}
-                          title="Exchange for a book of same price within 1 week"
-                        >
-                          <ArrowLeftRight className="w-3 h-3 inline mr-1" /> Exchange
-                        </button>
+                        <button type="button" className="btn btn-sm" onClick={() => setAdjusting(true)}>Return / exchange</button>
                       </div>
                     ) : returnedQty >= i.quantity ? (
                       <span className="badge badge-bad font-mono text-[10px]">Fully Returned</span>
@@ -330,6 +322,9 @@ export function BillDialog({ id, onClose, onChange }) {
         </table>
       </div>
 
+      {b.adjustments?.length > 0 && <section className="mt-4"><h3>Adjustment bills</h3><div className="table-wrap"><table className="ledger"><thead><tr><th>Adjustment</th><th>Date</th><th>Type</th><th>Settlement</th><th /></tr></thead><tbody>{b.adjustments.map(a=><tr key={a.id}><td>{a.adjustmentNo}</td><td>{fmtDateTime(a.createdAt)}</td><td>{a.type}</td><td>{a.netCents>0?'Collected':a.netCents<0?'Returned':'Even'} {fmt(Math.abs(a.netCents))}</td><td><Link className="btn btn-sm" to={`/adjustment/${a.id}`} target="_blank">View / print</Link></td></tr>)}</tbody></table></div></section>}
+      {b.isReturnEligible && currentShop?.id === b.shopId && b.adjustments?.some(a=>a.items.some(i=>i.sign===1 && i.returnedQty<i.quantity)) && <button className="btn mt-3" onClick={()=>setAdjusting(true)}>Return a replacement</button>}
+
       <div className="sum mt-3">
         <div><span>Subtotal</span><span>{fmt(b.subtotalCents)}</span></div>
         {b.discountCents > 0 && <div><span>Discount ({b.discountPercent}%)</span><span>− {fmt(b.discountCents)}</span></div>}
@@ -338,13 +333,13 @@ export function BillDialog({ id, onClose, onChange }) {
       </div>
 
       {/* Return & Exchange Audit Trail */}
-      {b.returns && b.returns.length > 0 && (
+      {b.returns?.some(r=>!b.adjustments?.some(a=>a.legacyReturnId===r.id)) && (
         <div className="mt-4 pt-3.5 border-t-2 border-black">
           <h3 className="!mt-0 !mb-2.5 text-xs uppercase font-mono font-bold tracking-wider text-black">
             Return & Exchange Audit Log ({b.returns.length})
           </h3>
           <div className="space-y-2">
-            {b.returns.map((r) => (
+            {b.returns.filter(r=>!b.adjustments?.some(a=>a.legacyReturnId===r.id)).map((r) => (
               <div
                 key={r.id}
                 className="p-3 bg-[#FAF9F5] border-2 border-black shadow-[2px_2px_0px_0px_#1A1A1A] text-xs font-mono flex flex-wrap items-center justify-between gap-2"
@@ -363,13 +358,13 @@ export function BillDialog({ id, onClose, onChange }) {
                   )}
                   {r.type === 'refund' && (
                     <div className="text-[#BE123C] font-semibold mt-1">
-                      ↩ Amount Refunded: {fmt(r.amountCents)}
+                      ↩ Refunded to customer: {fmt(r.paidBackCents ?? r.amountCents)}{r.taxCents > 0 && <span className="text-muted font-normal"> (incl. {fmt(r.taxCents)} tax)</span>}
                     </div>
                   )}
                 </div>
                 <div className="text-right text-muted text-[11px]">
                   <div>{fmtDateTime(r.createdAt)}</div>
-                  <div>Staff: {r.processedBy || 'Terminal Staff'}</div>
+                  {r.processedBy && <div>By {r.processedBy}</div>}
                 </div>
               </div>
             ))}
@@ -392,7 +387,7 @@ export function BillDialog({ id, onClose, onChange }) {
         </div>
       ) : (
         <Actions>
-          {isOwner && b.status === 'completed' && !b.orderId && (
+          {isOwner && b.status === 'completed' && !b.orderId && !b.adjustments?.length && !b.returns?.length && (
             <Button variant="danger" onClick={() => setVoiding(true)}>
               Void bill…
             </Button>
@@ -404,6 +399,7 @@ export function BillDialog({ id, onClose, onChange }) {
       )}
 
       {/* Refund Item Modal */}
+      {adjusting && <AdjustmentDialog sale={b} onClose={()=>setAdjusting(false)} onSuccess={()=>{st.reload();onChange?.();}} />}
       {refundTarget && (
         <RefundModal
           sale={b}
@@ -439,54 +435,26 @@ export default function Bills() {
   const [status, setStatus] = useState('');
   const [open, setOpen] = useState(null);
   const dq = useDebounced(q);
-  const st = useLoad(() => get(`/sales${qs({ q: dq, from, to, status, limit: 100 })}`), [dq, from, to, status]);
-
-  // Realtime updates: reload sales register automatically when sales or returns occur
-  useEffect(() => {
-    const unsub = subscribeToActivity(({ event }) => {
-      if (['sale', 'return', 'void'].includes(event)) {
-        st.reload();
-      }
-    });
-
-    let pgChannel = null;
-    try {
-      if (supabase) {
-        pgChannel = supabase.channel('bills-pg-sales')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'sales' }, () => {
-            st.reload();
-          })
-          .subscribe();
-      }
-    } catch {}
-
-    return () => {
-      unsub();
-      if (pgChannel && supabase) supabase.removeChannel(pgChannel);
-    };
-  }, [st.reload]);
+  // Cached between visits; a new bill, return or void anywhere in this browser marks it stale (lib/queryClient.js).
+  const st = useCached(['bills', 'list', dq, from, to, status], async () => {
+    const params = qs({ q: dq, from, to, status, limit: 100 });
+    const [sales, adjustments] = await Promise.all([get(`/sales${params}`), get(`/adjustments${params}`)]);
+    const items = [
+      ...sales.items.map(s => ({ ...s, kind: 'sale' })),
+      ...adjustments.items.map(a => ({ ...a, kind: 'adjustment' })),
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 100);
+    return { items, total: Number(sales.total) + Number(adjustments.total) };
+  });
 
   return (
     <div>
-      <PageTitle
-        actions={
-          <div className="flex items-center gap-2">
-            <span className="flex items-center gap-1.5 px-2.5 py-1 bg-[#ECFDF5] text-[#059669] border border-[#059669] text-xs font-mono font-bold shadow-[2px_2px_0px_0px_#059669]">
-              <span className="w-2 h-2 rounded-full bg-[#10B981] animate-ping" />
-              Live Sales
-            </span>
-            <span className="bg-[#DCFCE7] text-[#15803D] font-mono text-xs font-bold px-2.5 py-1 border border-[#15803D] shadow-[2px_2px_0px_0px_#15803D]">
-              Sales Register
-            </span>
-          </div>
-        }
-      >
+      <PageTitle>
         Bills
       </PageTitle>
 
       <div className="toolbar">
         <div className="grow flex-1 min-w-[200px]">
-          <label htmlFor="q">Search bill no., customer, title or ISBN</label>
+          <label htmlFor="q">Search bill or adjustment no., customer, title or ISBN</label>
           <input id="q" type="search" className="input" value={q} onChange={(e) => setQ(e.target.value)} />
         </div>
         <div>
@@ -518,6 +486,7 @@ export default function Bills() {
                   <thead>
                     <tr>
                       <th>Bill</th>
+                      <th>Type</th>
                       <th>Date</th>
                       <th>Customer</th>
                       <th>Payment</th>
@@ -528,14 +497,15 @@ export default function Bills() {
                   </thead>
                   <tbody>
                     {r.items.map((s) => (
-                      <tr key={s.id} className="row-click" onClick={() => setOpen(s.id)}>
-                        <td className="font-mono font-bold">{s.billNo}</td>
+                      <tr key={`${s.kind}-${s.id}`} className={s.kind === 'sale' ? 'row-click' : ''} onClick={() => s.kind === 'sale' && setOpen(s.id)}>
+                        <td className="font-mono font-bold">{s.kind === 'sale' ? s.billNo : <><Link className="underline" to={`/adjustment/${s.id}`}>{s.adjustmentNo}</Link><div className="text-xs text-muted font-normal">Against {s.billNo}</div></>}</td>
+                        <td>{s.kind === 'sale' ? 'Sale' : <span className="badge badge-bad">{s.type === 'refund' ? 'Refund' : 'Exchange'}</span>}</td>
                         <td>{fmtDateTime(s.createdAt)}</td>
                         <td>{s.customerName || '—'}</td>
-                        <td>{label(s.paymentMethod)}</td>
+                        <td>{s.paymentMethod ? label(s.paymentMethod) : '—'}</td>
                         <td className="num">{s.units}</td>
-                        <td className="num">{fmt(s.totalCents)}</td>
-                        <td><Badge status={s.status} /></td>
+                        <td className="num">{s.kind === 'sale' ? fmt(s.totalCents) : `${s.netCents < 0 ? '−' : s.netCents > 0 ? '+' : ''}${fmt(Math.abs(s.netCents))}`}</td>
+                        <td>{s.kind === 'sale' ? <Badge status={s.status} /> : <Link className="btn btn-sm" to={`/adjustment/${s.id}`}>View / print</Link>}</td>
                       </tr>
                     ))}
                   </tbody>

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { del, get, post, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { daysAgo, fmt, fmtDate, parseMoney, today } from '../lib/format';
-import { useLoad } from '../lib/hooks';
+import { useCached } from '../lib/hooks';
 import { confirmBox, toast } from '../lib/overlays';
 import { Async, Button, Empty, PageTitle, useAction } from '../lib/ui';
 
@@ -10,11 +10,11 @@ export default function Expenses() {
   const { settings } = useAuth();
   const [range, setRange] = useState({ from: daysAgo(89), to: today() });
   const [f, setF] = useState({ date: today(), category: '', description: '', amount: '' });
-  const st = useLoad(() => get(`/expenses${qs(range)}`), [range]);
+  const st = useCached(['expenses', range], () => get(`/expenses${qs(range)}`));
   const set = (k) => (e) => setF((x) => ({ ...x, [k]: e.target.value }));
   const [add, busy] = useAction(async () => {
     const cents = parseMoney(f.amount);
-    if (!cents) throw new Error('Enter an amount like 1500 or 1500.50');
+    if (!cents) throw new Error('Enter an amount in rupees, like 1500');
     await post('/expenses', { date: f.date, category: f.category, description: f.description, amountCents: cents });
     toast('Expense added'); setF((x) => ({ ...x, amount: '', description: '' })); st.reload();
   });

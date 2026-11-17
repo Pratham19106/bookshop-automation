@@ -6,15 +6,25 @@ export class ApiError extends Error {
   }
 }
 
-const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+export const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const SHOP_KEY = 'bk_active_shop';
+
+// The active shop is remembered per browser and sent with every request (the server validates it).
+export function getActiveShopId() {
+  try { const v = Number(localStorage.getItem(SHOP_KEY)); return Number.isInteger(v) && v > 0 ? v : null; } catch { return null; }
+}
+export function setActiveShopId(id) {
+  try { if (id) localStorage.setItem(SHOP_KEY, String(id)); else localStorage.removeItem(SHOP_KEY); } catch { /* storage blocked */ }
+}
 
 export async function api(method, path, body) {
+  const shopId = getActiveShopId();
   let res;
   try {
     res = await fetch(`${API_BASE}/api${path}`, {
       method,
       credentials: 'include',
-      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'bookshop' },
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'bookshop', ...(shopId ? { 'X-Shop-Id': String(shopId) } : {}) },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {

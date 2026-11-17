@@ -1,26 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { get, post, qs } from '../lib/api';
 import { useAuth } from '../lib/auth';
 import { bookName, fmt, fmtDate, fmtDateTime, money, parseMoney, uuid } from '../lib/format';
-import { useLoad } from '../lib/hooks';
+import { useCached } from '../lib/hooks';
 import { confirmBox, toast } from '../lib/overlays';
+import { broadcastEvent } from '../lib/events';
 import { Actions, Async, Badge, BookPicker, Button, Empty, Field, Modal, PageTitle, Tabs, useAction } from '../lib/ui';
 import { Check } from 'lucide-react';
 
 // New purchase order. `prefill` = { supplierId, items: [{ bookId, title, quantity }] } when coming from restocking.
 function PoForm({ prefill, onClose, onSaved }) {
   const { settings } = useAuth();
-  const suppliers = useLoad(() => get('/suppliers'), []);
+  const suppliers = useCached(['purchasing', 'suppliers', '', false], () => get('/suppliers'));
   const [supplierId, setSupplierId] = useState(prefill?.supplierId ? String(prefill.supplierId) : '');
   const [expected, setExpected] = useState('');
   const [notes, setNotes] = useState('');
   const [lines, setLines] = useState((prefill?.items ?? []).map((i) => ({ bookId: i.bookId, title: i.title, quantity: i.quantity, cost: '' })));
-  const quotes = useLoad(async () => {
-    if (!supplierId) return {};
+  const quotes = useCached(['purchasing', 'quotes', supplierId], async () => {
     const s = await get(`/suppliers/${supplierId}`);
     return Object.fromEntries(s.books.map((b) => [b.bookId, b.unitCostCents]));
-  }, [supplierId]);
+  }, { enabled: !!supplierId });
   const q = quotes.data || {};
   const costOf = (l) => (l.cost.trim() !== '' ? parseMoney(l.cost) : q[l.bookId] ?? null);
   const total = lines.reduce((s, l) => s + (costOf(l) ?? 0) * l.quantity, 0);
@@ -76,7 +76,8 @@ function PoForm({ prefill, onClose, onSaved }) {
 }
 
 function PoDetail({ id, onClose, onChange }) {
-  const st = useLoad(() => get(`/purchase-orders/${id}`), [id]);
+  const navigate = useNavigate();
+  const st = useCached(['purchasing', 'po', id], () => get(`/purchase-orders/${id}`));
   const key = useRef(uuid()); // a double-clicked "Receive" can never receive twice
   const [qty, setQty] = useState({});
   const [note, setNote] = useState('');
@@ -88,8 +89,9 @@ function PoDetail({ id, onClose, onChange }) {
   const receive = async () => {
     const items = po.items.map((i) => ({ poItemId: i.id, quantity: Number(qty[i.id]) || 0 })).filter((i) => i.quantity > 0);
     if (!items.length) throw new Error('Enter a received quantity for at least one line');
-    await post(`/purchase-orders/${id}/receive`, { items, note, idempotencyKey: key.current });
-    toast('Stock updated from goods received'); onChange?.(); onClose();
+    const received = await post(`/purchase-orders/${id}/receive`, { items, note, idempotencyKey: key.current });
+    broadcastEvent('stock', { purchaseOrderId: id });
+    toast('Stock updated. Arrange the received books.'); onChange?.(); onClose(); navigate(`/arrangement?receipt=${received.receiptId}`);
   };
   const cancel = async () => {
     if (!(await confirmBox(`Cancel ${po.poNo}? Nothing further can be received against it.`))) return;
@@ -132,7 +134,7 @@ export default function Purchases() {
   const [status, setStatus] = useState('');
   const [open, setOpen] = useState(null);
   const [form, setForm] = useState(null); // null | { prefill }
-  const st = useLoad(() => get(`/purchase-orders${qs({ status })}`), [status]);
+  const st = useCached(['purchasing', 'list', status], () => get(`/purchase-orders${qs({ status })}`));
   const { state } = useLocation();
   const prefill = useMemo(() => state?.poPrefill, [state]);
   useEffect(() => { if (prefill) { setForm({ prefill }); window.history.replaceState({}, ''); } }, [prefill]);
@@ -142,9 +144,6 @@ export default function Purchases() {
       <PageTitle
         actions={
           <div className="flex items-center gap-2">
-            <span className="bg-[#FFE4E6] text-[#BE123C] font-mono text-xs font-bold px-2.5 py-1 border border-[#BE123C] shadow-[2px_2px_0px_0px_#BE123C] hidden sm:inline-block">
-              06 · Restocking POs
-            </span>
             <button id="new-po" className="btn btn-primary" onClick={() => setForm({})}>
               + New purchase order
             </button>

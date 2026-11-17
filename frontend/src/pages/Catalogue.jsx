@@ -4,11 +4,43 @@ import { useAuth } from '../lib/auth';
 import { BookCover } from '../lib/cover';
 import { MotionTr } from '../lib/motion';
 import { fmt, fmtDateTime, money, parseMoney } from '../lib/format';
-import { useDebounced, useLoad } from '../lib/hooks';
+import { useCached, useDebounced } from '../lib/hooks';
+import { broadcastEvent } from '../lib/events';
 import { confirmBox, toast } from '../lib/overlays';
 import { Actions, Async, Badge, Button, Empty, Field, Loc, Modal, PageTitle, useAction } from '../lib/ui';
 
 const REASONS = { sale: 'Sale', sale_void: 'Sale voided', receipt: 'Goods received', adjustment: 'Stock count correction', opening: 'Opening stock' };
+
+// Search the shared ISBN catalogue (~10k+ titles) so a new title is picked, not typed. Picking fills the form.
+function CatalogLookup({ onPick }) {
+  const [q, setQ] = useState('');
+  const dq = useDebounced(q);
+  const term = dq.trim();
+  const st = useCached(['catalog', term], () => get(`/catalog/search${qs({ q: term })}`), { enabled: term.length >= 2 });
+  const items = st.data?.items || [];
+  return (
+    <div className="border-2 border-black bg-[#FAF9F5] p-3 mb-3">
+      <Field label="Find it in the ISBN catalogue (title or ISBN)" htmlFor="cat-q">
+        <input id="cat-q" type="search" className="input" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="e.g. 9780141036144 or wings of fire" />
+      </Field>
+      {st.error && <p className="text-brick text-[.85rem]">{st.error.message}</p>}
+      {dq.trim().length >= 2 && !st.loading && !st.error && items.length === 0 && <p className="text-muted text-[.85rem]">Not in the catalogue; fill in the details below.</p>}
+      {items.length > 0 && (
+        <ul className="max-h-56 overflow-y-auto divide-y divide-[#E5E7EB] bg-white border border-black">
+          {items.map((c) => (
+            <li key={c.isbn}>
+              <button type="button" disabled={!!c.bookId} className="w-full text-left px-2.5 py-1.5 hover:bg-[#CCFF00] disabled:opacity-50 disabled:hover:bg-transparent" onClick={() => onPick(c)}>
+                <strong>{c.title}</strong>
+                <span className="text-muted text-[.8rem]"> · {[c.publisher, c.format, c.category].filter(Boolean).join(' · ')}</span>
+                <div className="font-mono text-[.75rem] text-muted">{c.isbn}{c.bookId ? ' · already in your catalogue' : ''}</div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 // Add/edit form. Stock is not editable here: it only changes through sales, receipts and counted corrections.
 export function BookForm({ book, onClose, onSaved }) {
@@ -19,17 +51,19 @@ export function BookForm({ book, onClose, onSaved }) {
     price: book ? money(book.priceCents) : '', threshold: book && !book.thresholdIsDefault ? String(book.lowStockThreshold) : '',
     openingStock: '0', aisle: book?.aisle ?? '', rack: book?.rack ?? '', shelf: book?.shelf ?? '',
   });
-  const genres = useLoad(() => get('/books/genres'), []);
+  const genres = useCached(['books', 'genres'], () => get('/books/genres'));
+  const pick = (c) => setF((s) => ({ ...s, title: c.title, isbn: c.isbn, publisher: c.publisher || s.publisher, edition: c.format || s.edition, genre: c.category || s.genre }));
   const set = (k) => (e) => setF((s) => ({ ...s, [k]: e.target.value }));
   const [save, busy] = useAction(async () => {
     const price = parseMoney(f.price);
-    if (price === null) throw new Error('Enter the price like 199 or 199.50');
+    if (price === null) throw new Error('Enter the price in rupees, like 199');
     const body = {
       title: f.title, author: f.author, isbn: f.isbn, publisher: f.publisher, edition: f.edition, genre: f.genre, priceCents: price,
-      aisle: f.aisle, rack: f.rack, shelf: f.shelf, lowStockThreshold: f.threshold === '' ? null : Number(f.threshold),
+      lowStockThreshold: f.threshold === '' ? null : Number(f.threshold),
     };
     if (!edit) body.openingStock = Number(f.openingStock || 0);
     const saved = edit ? await put(`/books/${book.id}`, body) : await post('/books', body);
+    broadcastEvent('books', { bookId: saved?.id });
     toast(edit ? 'Book updated' : 'Book added');
     onSaved?.(saved); onClose();
   });
@@ -39,9 +73,10 @@ export function BookForm({ book, onClose, onSaved }) {
   return (
     <Modal title={edit ? `Edit: ${book.title}` : 'Add a book'} wide onClose={onClose}>
       <form onSubmit={save}>
+        {!edit && <CatalogLookup onPick={pick} />}
         <div className="grid sm:grid-cols-2 gap-x-2.5">
           {inp('title', 'Title *', { required: true, maxLength: 300 })}
-          {inp('author', 'Author *', { required: true, maxLength: 200 })}
+          {inp('author', 'Author', { maxLength: 200 })}
           {inp('isbn', 'ISBN (10 or 13 digits)', { maxLength: 20, className: 'input font-mono' })}
           {inp('publisher', 'Publisher', { maxLength: 200 })}
           {inp('edition', 'Edition (e.g. 2nd, Paperback 2021)', { maxLength: 100 })}
@@ -51,8 +86,7 @@ export function BookForm({ book, onClose, onSaved }) {
           {!edit && inp('openingStock', 'Opening stock', { type: 'number', min: 0, className: 'input font-mono' })}
         </div>
         <datalist id="genres">{(genres.data || []).map((g) => <option key={g} value={g} />)}</datalist>
-        <h3>Shelf location</h3>
-        <div className="grid grid-cols-3 gap-x-2.5">{inp('aisle', 'Aisle', { maxLength: 30 })}{inp('rack', 'Rack', { maxLength: 30 })}{inp('shelf', 'Shelf', { maxLength: 30 })}</div>
+        <p className="text-muted text-sm">Place copies using Books to Arrange after creating the book.</p>
         <p className="text-muted text-[.85rem]">A different edition of the same title is a separate record with its own ISBN and stock.</p>
         <Actions><button type="button" className="btn" onClick={onClose}>Cancel</button><button className="btn btn-primary" disabled={busy}>{edit ? 'Save changes' : 'Add book'}</button></Actions>
       </form>
@@ -65,6 +99,7 @@ export function AdjustDialog({ book, onClose, onDone }) {
   const [why, setWhy] = useState('');
   const apply = async () => {
     await post(`/books/${book.id}/adjust`, { countedQty: Number(counted), reason: why });
+    broadcastEvent('books', { bookId: book.id });
     toast('Stock corrected'); onDone?.(); onClose();
   };
   return (
@@ -78,11 +113,11 @@ export function AdjustDialog({ book, onClose, onDone }) {
 }
 
 export function BookDetail({ id, onClose, onChange }) {
-  const { isOwner } = useAuth();
-  const st = useLoad(async () => {
+  const { isManager: isOwner } = useAuth(); // managers and owners manage stock and see costs
+  const st = useCached(['books', 'detail', id, isOwner], async () => {
     const [book, moves, sup] = await Promise.all([get(`/books/${id}`), get(`/books/${id}/movements?limit=30`), isOwner ? get(`/books/${id}/suppliers`) : Promise.resolve(null)]);
     return { book, moves, sup };
-  }, [id]);
+  });
   const [sub, setSub] = useState(null); // 'edit' | 'adjust'
   const changed = () => { st.reload(); onChange?.(); };
 
@@ -114,6 +149,7 @@ export function BookDetail({ id, onClose, onChange }) {
                   <Button variant={b.active ? 'danger' : ''} onClick={async () => {
                     if (b.active && !(await confirmBox(`Retire “${b.title}”? It will disappear from billing and search but keep its history.`))) return;
                     await post(`/books/${id}/active`, { active: !b.active });
+                    broadcastEvent('books', { bookId: id });
                     toast(b.active ? 'Title retired' : 'Title restored'); changed();
                   }}>{b.active ? 'Retire title' : 'Restore title'}</Button>
                 )}
@@ -155,7 +191,7 @@ export function BookDetail({ id, onClose, onChange }) {
 }
 
 export default function Catalogue() {
-  const { isOwner } = useAuth();
+  const { isManager: isOwner } = useAuth(); // managers and owners manage stock and see costs
   const [q, setQ] = useState('');
   const [genre, setGenre] = useState('');
   const [low, setLow] = useState(false);
@@ -163,20 +199,17 @@ export default function Catalogue() {
   const [open, setOpen] = useState(null);
   const [adding, setAdding] = useState(false);
   const dq = useDebounced(q);
-  const genres = useLoad(() => get('/books/genres'), []);
-  const st = useLoad(() => get(`/books${qs({ q: dq, genre, low, inactive, limit: 100 })}`), [dq, genre, low, inactive]);
+  const genres = useCached(['books', 'genres'], () => get('/books/genres'));
+  const st = useCached(['books', 'list', dq, genre, low, inactive], () => get(`/books${qs({ q: dq, genre, low, inactive, limit: 100 })}`));
 
   return (
     <div>
       <PageTitle
         actions={
           <div className="flex items-center gap-2">
-            <span className="bg-[#EEF2FF] text-[#4F46E5] font-mono text-xs font-bold px-2.5 py-1 border border-[#4F46E5] shadow-[2px_2px_0px_0px_#4F46E5] hidden sm:inline-block">
-              02 · Catalogue
-            </span>
-            <button id="add" className="btn btn-primary" onClick={() => setAdding(true)}>
+            {isOwner && <button id="add" className="btn btn-primary" onClick={() => setAdding(true)}>
               + Add book
-            </button>
+            </button>}
           </div>
         }
       >
@@ -190,7 +223,7 @@ export default function Catalogue() {
         {isOwner && <label className="!normal-case !font-normal !tracking-normal !text-[.9rem] !text-ink flex items-center gap-1"><input type="checkbox" checked={inactive} onChange={(e) => setInactive(e.target.checked)} /> Show retired</label>}
       </div>
       <Async state={st}>
-        {(r) => r.items.length === 0 ? <Empty>No books found. {q && 'Try fewer words, or '}<button className="btn btn-link" onClick={() => setAdding(true)}>add a new book</button>.</Empty> : (
+        {(r) => r.items.length === 0 ? <Empty>No books found. {q && 'Try fewer words'}{isOwner && <>{q ? ', or ' : ''}<button className="btn btn-link" onClick={() => setAdding(true)}>add a new book</button></>}.</Empty> : (
           <>
             <div className="table-wrap">
               <table className="ledger">

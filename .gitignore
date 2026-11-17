@@ -1,7 +1,11 @@
 node_modules/
 frontend/dist/
-backend/data/*.db
-backend/data/*.db-*
-backend/data/backups/
+backend/backups/
+archive/sqlite-data/
 .env
 *.log
+
+# local secrets and tool state: never commit
+pass.txt
+supabase/.temp/
+frontend/src/utils/supabase.ts
